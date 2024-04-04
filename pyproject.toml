@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "logistics-envs"
+version = "0.1.0"
+description = ""
+authors = ["Daniil Burakov <sarrasorwork@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+gymnasium = "^0.29.1"
+pygame = "^2.5.2"
+matplotlib = "^3.8.4"
+numpy = "^1.26.4"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
