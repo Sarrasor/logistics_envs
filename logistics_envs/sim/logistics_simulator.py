@@ -254,6 +254,9 @@ class LogisticsSimulator:
             if self._done and order.status != OrderStatus.COMPLETED:
                 current_reward += 1e6
 
+        # Reward is negative since it is a penalty
+        current_reward = -1.0 * current_reward
+
         self._rewards[self._current_time] = current_reward
         return current_reward
 
