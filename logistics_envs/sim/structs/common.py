@@ -17,6 +17,9 @@ class Location:
     def __hash__(self):
         return hash((self.lat, self.lon))
 
+    def near(self, other: "Location", threshold: float = 1e-4) -> bool:
+        return abs(self.lat - other.lat) < threshold and abs(self.lon - other.lon) < threshold
+
 
 @dataclass
 class BoundingBox:

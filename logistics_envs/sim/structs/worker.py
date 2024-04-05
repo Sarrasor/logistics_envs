@@ -5,10 +5,18 @@ from typing import Optional
 
 import numpy as np
 
-# from logistics_envs.sim.logistics_simulator import LogisticsSimulator
-from logistics_envs.sim.structs.action import ActionType, MoveActionParameters, WorkerAction
+from logistics_envs.sim.structs.action import (
+    ActionType,
+    DeliverActionParameters,
+    DropOffActionParameters,
+    MoveActionParameters,
+    PickupActionParameters,
+    ServiceActionParameters,
+    WorkerAction,
+)
 from logistics_envs.sim.structs.common import Location
 from logistics_envs.sim.structs.config import LocationMode, WorkerTravelType
+from logistics_envs.sim.structs.order import Order
 
 
 class WorkerStatus(str, Enum):
@@ -46,7 +54,7 @@ class Worker:
         travel_type: WorkerTravelType,
         speed: float,
         color: str,
-        sim: "LogisticsSimulator",
+        sim: "LogisticsSimulator",  # noqa: F821 # type: ignore
         logger: Logger,
     ):
         self._id = id
@@ -61,6 +69,8 @@ class Worker:
         self._status = WorkerStatus.IDLE
         self._busy_until: Optional[int] = None
         self._path: Optional[dict[int, Location]] = None
+        self._picked_up_order_ids: set[str] = set()
+        self._current_order_id: Optional[str] = None
 
     @property
     def id(self) -> str:
@@ -126,9 +136,17 @@ class Worker:
                 case WorkerStatus.MOVING:
                     self._set_idle_state()
                 case WorkerStatus.MOVING_TO_PICKUP:
-                    raise NotImplementedError("Moving to pickup transition is not implemented")
+                    if self._current_order_id is None:
+                        raise ValueError(
+                            "Worker is in moving to pickup state, but order_id is not set"
+                        )
+                    self._pickup(self._current_order_id, current_time)
                 case WorkerStatus.MOVING_TO_DROP_OFF:
-                    raise NotImplementedError("Moving to drop off transition is not implemented")
+                    if self._current_order_id is None:
+                        raise ValueError(
+                            "Worker is in moving to drop off state, but order_id is not set"
+                        )
+                    self._drop_off(self._current_order_id, current_time)
                 case _:
                     raise ValueError(f"Unsupported moving status {self._status} in moving update")
 
@@ -139,11 +157,15 @@ class Worker:
             raise ValueError("Worker is in picking up state, but busy_until is not set")
 
         if current_time >= self._busy_until:
+            if self._current_order_id is None:
+                raise ValueError("Worker is in picking up state, but order_id is not set")
+            self._picked_up_order_ids.add(self._current_order_id)
             match self._current_action.type:
                 case ActionType.PICKUP:
+                    self._current_order_id = None
                     self._set_idle_state()
                 case ActionType.DELIVER:
-                    raise NotImplementedError("Deliver transition is not implemented")
+                    self._drop_off(self._current_order_id, current_time)
                 case _:
                     raise ValueError(
                         f"Unsupported action type {self._current_action.type} in picking up state"
@@ -190,26 +212,37 @@ class Worker:
 
         match action.type:
             case ActionType.MOVE:
-                self._move(action, current_time, WorkerStatus.MOVING)
+                if type(action.parameters) is not MoveActionParameters:
+                    raise ValueError(f"Invalid move action parameters {action.parameters}")
+
+                self._move(action.parameters.to_location, current_time, WorkerStatus.MOVING)
             case ActionType.DELIVER:
-                self._deliver(action, current_time)
+                if type(action.parameters) is not DeliverActionParameters:
+                    raise ValueError(f"Invalid deliver action parameters {action.parameters}")
+
+                self._deliver(action.parameters.order_id, current_time)
             case ActionType.PICKUP:
-                self._pickup(action, current_time)
+                if type(action.parameters) is not PickupActionParameters:
+                    raise ValueError(f"Invalid pickup action parameters {action.parameters}")
+
+                self._pickup(action.parameters.order_id, current_time)
             case ActionType.DROP_OFF:
-                self._drop_off(action, current_time)
+                if type(action.parameters) is not DropOffActionParameters:
+                    raise ValueError(f"Invalid drop off action parameters {action.parameters}")
+                self._drop_off(action.parameters.order_id, current_time)
             case ActionType.SERVICE:
-                self._service(action, current_time)
+                if type(action.parameters) is not ServiceActionParameters:
+                    raise ValueError(f"Invalid service action parameters {action.parameters}")
+
+                self._service(
+                    action.parameters.service_location,
+                    action.parameters.max_service_time,
+                    current_time,
+                )
             case _:
                 raise ValueError(f"Unknown action type {action.type}")
 
-    def _move(self, action: WorkerAction, current_time: int, moving_status: WorkerStatus) -> None:
-        if type(action.parameters) != MoveActionParameters:
-            raise ValueError(
-                f"Move action parameters are not of type MoveActionParameters: {action.parameters}"
-            )
-        parameters: MoveActionParameters = action.parameters
-        location = parameters.to_location
-
+    def _move(self, location: Location, current_time: int, moving_status: WorkerStatus) -> None:
         if self._sim.location_mode == LocationMode.CARTESIAN:
             path, busy_until = self._generate_cartesian_path(location, current_time)
         else:
@@ -260,14 +293,41 @@ class Worker:
     ) -> tuple[dict[int, Location], int]:
         raise NotImplementedError("Geographic path generation is not implemented")
 
-    def _pickup(self, action: WorkerAction, current_time: int) -> None:
-        raise NotImplementedError("Pickup action is not implemented")
+    def _pickup(self, order_id: str, current_time: int) -> None:
+        self._logger.debug(f"Worker {self._id} is picking up order {order_id}")
+        order: Order = self._sim.get_order(order_id)
+        self._current_order_id = order_id
 
-    def _drop_off(self, action: WorkerAction, current_time: int) -> None:
-        raise NotImplementedError("Drop off action is not implemented")
+        if not self._location.near(order.from_location):
+            self._logger.debug(f"Worker {self._id} is moving to pickup order {order_id}")
+            self._move(order.from_location, current_time, WorkerStatus.MOVING_TO_PICKUP)
+        else:
+            self._logger.debug(f"Worker {self._id} is calling sim to pick up order {order_id}")
+            self._busy_until = self._sim.pickup_order(order.id, self.id)
+            self._status = WorkerStatus.PICKING_UP
 
-    def _service(self, action: WorkerAction, current_time: int) -> None:
+    def _drop_off(self, order_id: str, current_time: int) -> None:
+        self._logger.debug(f"Worker {self._id} is dropping off order {order_id}")
+        order: Order = self._sim.get_order(order_id)
+        self._current_order_id = order_id
+
+        if not self._location.near(order.to_location):
+            self._logger.debug(f"Worker {self._id} is moving to drop off order {order_id}")
+            self._move(order.to_location, current_time, WorkerStatus.MOVING_TO_DROP_OFF)
+        else:
+            self._logger.debug(f"Worker {self._id} is calling sim to drop off order {order_id}")
+            self._busy_until = self._sim.drop_off_order(order.id, self.id)
+            self._status = WorkerStatus.DROPPING_OFF
+
+    def _deliver(self, order_id: str, current_time: int) -> None:
+        order: Order = self._sim.get_order(order_id)
+
+        if order.id in self._picked_up_order_ids:
+            self._drop_off(order_id, current_time)
+        else:
+            self._pickup(order_id, current_time)
+
+    def _service(
+        self, service_location: Location, max_service_time: int, current_time: int
+    ) -> None:
         raise NotImplementedError("Service action is not implemented")
-
-    def _deliver(self, action: WorkerAction, current_time: int) -> None:
-        raise NotImplementedError("Deliver action is not implemented")

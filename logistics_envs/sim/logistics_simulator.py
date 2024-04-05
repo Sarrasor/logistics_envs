@@ -70,6 +70,11 @@ class LogisticsSimulator:
     def step_size(self) -> int:
         return self._dt
 
+    def get_order(self, order_id: str) -> Order:
+        if order_id not in self._orders:
+            raise ValueError(f"Order {order_id} does not exist")
+        return self._orders[order_id]
+
     def reset(self) -> tuple[Observation, Info]:
         logger.debug("Resetting simulator")
 
@@ -128,6 +133,60 @@ class LogisticsSimulator:
             pygame.display.quit()
             pygame.quit()
 
+    def pickup_order(self, order_id: str, worker_id: str) -> int:
+        self._basic_check(order_id, worker_id)
+        order = self._orders[order_id]
+
+        if order.status != OrderStatus.CREATED:
+            raise ValueError(f"Cannot pick up order {order_id} with status {order.status}")
+
+        if order.assigned_worker_id is not None:
+            raise ValueError(
+                f"Order {order_id} is already assigned to worker {order.assigned_worker_id}"
+            )
+
+        worker = self._workers[worker_id]
+
+        if not worker.location.near(order.from_location):
+            raise ValueError(
+                f"Worker {worker_id} is not at the order {order.id} pickup location. Worker location: {worker.location}, order pickup location: {order.from_location}"
+            )
+
+        # TODO(dburakov): Add pickup time sampler
+        pickup_time = self._config.order_pickup_time
+        pickup_end_time = self._current_time + pickup_time
+
+        order.pickup(worker_id, self._current_time, pickup_end_time)
+
+        return pickup_end_time
+
+    def drop_off_order(self, order_id: str, worker_id: str) -> int:
+        self._basic_check(order_id, worker_id)
+        order = self._orders[order_id]
+
+        if order.status != OrderStatus.IN_DELIVERY:
+            raise ValueError(f"Cannot drop off order {order_id} with status {order.status}")
+
+        worker = self._workers[worker_id]
+
+        if worker.id != order.assigned_worker_id:
+            raise ValueError(
+                f"Worker {worker_id} is not assigned to order {order.id}. Assigned worker: {order.assigned_worker_id}"
+            )
+
+        if not worker.location.near(order.to_location):
+            raise ValueError(
+                f"Worker {worker_id} is not at the order {order.id} drop off location. Worker location: {worker.location}, order drop off location: {order.to_location}"
+            )
+
+        # TODO(dburakov): Add drop off time sampler
+        drop_off_time = self._config.order_drop_off_time
+        drop_off_end_time = self._current_time + drop_off_time
+
+        order.drop_off(self._current_time, drop_off_end_time)
+
+        return drop_off_end_time
+
     def _get_current_observation(self) -> Observation:
         workers = [worker.get_observation() for worker in self._workers.values()]
         orders = [order.get_observation() for order in self._orders.values()]
@@ -150,54 +209,6 @@ class LogisticsSimulator:
 
             worker = self._workers[worker_action.worker_id]
             worker.perform_action(worker_action.action, self._current_time)
-
-    def _pick_up_order(self, order_id: str, worker_id: str) -> None:
-        self._basic_check(order_id, worker_id)
-        order = self._orders[order_id]
-
-        if order.status != OrderStatus.CREATED:
-            raise ValueError(f"Cannot pick up order {order_id} with status {order.status}")
-
-        if order.assigned_worker_id is not None:
-            raise ValueError(
-                f"Order {order_id} is already assigned to worker {order.assigned_worker_id}"
-            )
-
-        worker = self._workers[worker_id]
-
-        if worker.location != order.from_location:
-            raise ValueError(
-                f"Worker {worker_id} is not at the order {order.id} pickup location. Worker location: {worker.location}, order pickup location: {order.from_location}"
-            )
-
-        # TODO(dburakov): Add pickup time sampler
-        pickup_time = self._config.order_pickup_time
-
-        order.pickup(worker_id, self._current_time, self._current_time + pickup_time)
-
-    def _drop_off_order(self, order_id: str, worker_id: str) -> None:
-        self._basic_check(order_id, worker_id)
-        order = self._orders[order_id]
-
-        if order.status != OrderStatus.IN_DELIVERY:
-            raise ValueError(f"Cannot drop off order {order_id} with status {order.status}")
-
-        worker = self._workers[worker_id]
-
-        if worker.id != order.assigned_worker_id:
-            raise ValueError(
-                f"Worker {worker_id} is not assigned to order {order.id}. Assigned worker: {order.assigned_worker_id}"
-            )
-
-        if worker.location != order.to_location:
-            raise ValueError(
-                f"Worker {worker_id} is not at the order {order.id} drop off location. Worker location: {worker.location}, order drop off location: {order.to_location}"
-            )
-
-        # TODO(dburakov): Add drop off time sampler
-        drop_off_time = self._config.order_drop_off_time
-
-        order.drop_off(self._current_time, self._current_time + drop_off_time)
 
     def _basic_check(self, order_id: str, worker_id: str) -> None:
         if worker_id not in self._workers:

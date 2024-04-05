@@ -48,6 +48,7 @@ class WorkerAction:
         | DeliverActionParameters
         | PickupActionParameters
         | DropOffActionParameters
+        | ServiceActionParameters
     )
 
 
