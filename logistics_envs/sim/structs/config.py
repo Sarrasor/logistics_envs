@@ -50,9 +50,25 @@ class RandomOrderGeneratorConfig:
 
 
 @dataclass
+class DepotRandomOrderGeneratorConfig:
+    order_generation_start_time: int
+    order_generation_end_time: int
+    generation_probability: float
+    max_concurrent_orders: int
+    depot_location: Location
+    lat_range: tuple[float, float]
+    lon_range: tuple[float, float]
+    window_size: int
+
+
+@dataclass
 class OrderGeneratorConfig:
     generator_type: str
-    config: PredefinedOrderGeneratorConfig | RandomOrderGeneratorConfig
+    config: (
+        PredefinedOrderGeneratorConfig
+        | RandomOrderGeneratorConfig
+        | DepotRandomOrderGeneratorConfig
+    )
 
 
 class RenderMode(str, Enum):
