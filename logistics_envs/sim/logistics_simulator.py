@@ -129,9 +129,10 @@ class LogisticsSimulator:
             return self._render_json()
 
     def close(self) -> None:
-        if self._pygame_window is not None:
-            pygame.display.quit()
-            pygame.quit()
+        if self._render_mode == RenderMode.PYGAME:
+            if self._pygame_window is not None:
+                pygame.display.quit()
+                pygame.quit()
 
     def pickup_order(self, order_id: str, worker_id: str) -> int:
         self._basic_check(order_id, worker_id)
