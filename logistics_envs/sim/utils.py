@@ -27,6 +27,9 @@ def set_global_seeds(i):
 def generate_colors(
     n_colors: int,
 ) -> list:
+    if n_colors < 1:
+        raise ValueError(f"n_colors={n_colors} must be greater than 0")
+
     colors = [
         "#" + "".join([random.choice("0123456789ABCDEF") for _ in range(6)])
         for _ in range(n_colors)
