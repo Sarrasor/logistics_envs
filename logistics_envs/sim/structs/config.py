@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-from logistics_envs.sim.structs.common import Location
+from logistics_envs.sim.structs.common import BoundingBox, Location
 
 
 class WorkerTravelType(str, Enum):
@@ -16,6 +16,7 @@ class WorkerConfig:
     id: str
     initial_location: Location
     travel_type: WorkerTravelType
+    speed: float
 
 
 class LocationMode(str, Enum):
@@ -54,6 +55,27 @@ class OrderGeneratorConfig:
     config: PredefinedOrderGeneratorConfig | RandomOrderGeneratorConfig
 
 
+class RenderMode(str, Enum):
+    NONE = "NONE"
+    JSON = "JSON"
+    PYGAME = "PYGAME"
+    WEB = "WEB"
+
+
+@dataclass
+class PygameRenderConfig:
+    render_fps: int
+    window_size: tuple[int, int]
+    hide_completed_orders: bool
+    bounding_box: BoundingBox
+
+
+@dataclass
+class RenderConfig:
+    render_mode: RenderMode
+    config: Optional[PygameRenderConfig] = None
+
+
 @dataclass
 class LogisticsSimulatorConfig:
     location_mode: LocationMode
@@ -62,4 +84,8 @@ class LogisticsSimulatorConfig:
     start_time: int
     end_time: int
     step_size: int
+    # TODO(dburakov): add pickup and drop_off samplers
+    order_pickup_time: int
+    order_drop_off_time: int
+    render: RenderConfig
     seed: Optional[int] = None

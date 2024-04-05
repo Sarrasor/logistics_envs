@@ -4,9 +4,9 @@ from logistics_envs.sim.structs.common import Location
 
 
 class ActionType(str, Enum):
-    IDLE = "IDLE"  # Do nothing
+    NOOP = "NOOP"  # Do nothing
     MOVE = "MOVE"  # Move to a location
-    DELIVER = "DELIVER"  # Deliver an order
+    DELIVER = "DELIVER"  # Deliver an order. Performs move, pickup and drop off actions by itself
     PICKUP = "PICKUP"  # Pick up an order from a location. Can be used for multi-order delivery
     DROP_OFF = "DROP_OFF"  # Drop off an order at a location. Can be used for multi-order delivery
     SERVICE = "SERVICE"  # Perform service at a location. For example, clean the vehicle or refuel

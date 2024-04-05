@@ -86,6 +86,30 @@ class Order:
     def id(self) -> str:
         return self._id
 
+    @property
+    def from_location(self) -> Location:
+        return self._from_location
+
+    @property
+    def to_location(self) -> Location:
+        return self._to_location
+
+    @property
+    def time_window(self) -> list[tuple[int, int]]:
+        return self._time_window
+
+    @property
+    def status(self) -> OrderStatus:
+        return self._status
+
+    @property
+    def completion_time(self) -> Optional[int]:
+        return self._completion_time
+
+    @property
+    def assigned_worker_id(self) -> Optional[str]:
+        return self._assigned_worker_id
+
     def pickup(self, worker_id: str, pickup_start_time: int, pickup_end_time: int) -> None:
         self._assigned_worker_id = worker_id
         self._pickup_start_time = pickup_start_time
