@@ -26,7 +26,10 @@ class DepotRandomOrderGenerator(OrderGenerator):
         if np.random.random() > self._config.generation_probability:
             return orders
 
-        n_orders = np.random.randint(1, self._config.max_concurrent_orders)
+        if self._config.max_concurrent_orders == 1:
+            n_orders = 1
+        else:
+            n_orders = np.random.randint(1, self._config.max_concurrent_orders)
         for i in range(n_orders):
             order_location = Location(
                 lat=np.random.uniform(*self._config.lat_range),

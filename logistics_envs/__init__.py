@@ -21,3 +21,5 @@ register(
         "max_concurrent_orders": 4,
     },
 )
+
+__version__ = "0.0.1"
