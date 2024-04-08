@@ -50,6 +50,7 @@ class LogisticsSimulator:
 
             self._pygame_window = None
             self._pygame_clock = None
+            self._pygame_font = None
 
         self._order_generator = getattr(
             order_generators, self._config.order_generator.generator_type
@@ -190,7 +191,11 @@ class LogisticsSimulator:
 
     def _get_current_observation(self) -> Observation:
         workers = [worker.get_observation() for worker in self._workers.values()]
-        orders = [order.get_observation() for order in self._orders.values()]
+        orders = [
+            order.get_observation()
+            for order in self._orders.values()
+            if order.status != OrderStatus.COMPLETED
+        ]
         observation = Observation(current_time=self._current_time, workers=workers, orders=orders)
         return observation
 
@@ -275,6 +280,9 @@ class LogisticsSimulator:
         if self._pygame_clock is None:
             self._pygame_clock = pygame.time.Clock()
 
+        if self._pygame_font is None:
+            self._pygame_font = pygame.font.Font(None, 20)
+
         surface = pygame.Surface(self._window_size)
         surface.fill((255, 255, 255))
 
@@ -319,7 +327,12 @@ class LogisticsSimulator:
                 radius=3,
             )
 
+        current_time = self._pygame_font.render(
+            f"Current time: {self._current_time}", True, (0, 0, 0)
+        )
+
         self._pygame_window.blit(surface, surface.get_rect())
+        self._pygame_window.blit(current_time, (10, 10))
         pygame.event.pump()
         pygame.display.update()
 

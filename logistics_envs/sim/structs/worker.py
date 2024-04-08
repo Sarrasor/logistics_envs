@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from logging import Logger
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 
@@ -34,6 +34,26 @@ class WorkerStatus(str, Enum):
     MOVING_TO_DROP_OFF = "MOVING_TO_DROP_OFF"
     PICKING_UP = "PICKING_UP"
     DROPPING_OFF = "DROPPING_OFF"
+
+    def to_int(self) -> int:
+        return self._get_int_from_string(self.value)
+
+    def _get_int_from_string(self, status_str: str) -> int:
+        match status_str:
+            case "IDLE":
+                return 0
+            case "MOVING":
+                return 1
+            case "MOVING_TO_PICKUP":
+                return 2
+            case "MOVING_TO_DROP_OFF":
+                return 3
+            case "PICKING_UP":
+                return 4
+            case "DROPPING_OFF":
+                return 5
+            case _:
+                raise ValueError(f"Unknown status string: {status_str}")
 
     @staticmethod
     def is_moving_status(status: "WorkerStatus") -> bool:

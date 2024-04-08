@@ -1,6 +1,13 @@
-from pydantic import BaseModel, PositiveFloat, NonNegativeFloat, PositiveInt, NonNegativeInt
 from enum import Enum
 from typing import Optional
+
+from pydantic import (
+    BaseModel,
+    NonNegativeFloat,
+    NonNegativeInt,
+    PositiveFloat,
+    PositiveInt,
+)
 
 from logistics_envs.sim.structs.common import BoundingBox, Location, LocationMode
 from logistics_envs.sim.structs.worker import WorkerTravelType

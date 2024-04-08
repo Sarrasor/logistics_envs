@@ -14,6 +14,9 @@ class OrderStatus(Enum):
     IN_DROP_OFF = "IN_DROP_OFF"
     COMPLETED = "COMPLETED"
 
+    def to_int(self) -> int:
+        return self._get_int_from_string(self.value)
+
     def _get_int_from_string(self, status_str: str) -> int:
         match status_str:
             case "CREATED":
