@@ -16,7 +16,7 @@ from logistics_envs.sim.structs.info import Info
 from logistics_envs.sim.structs.observation import Observation
 from logistics_envs.sim.structs.order import Order, OrderStatus
 from logistics_envs.sim.structs.worker import Worker, WorkerStatus
-from logistics_envs.sim.utils import generate_colors
+from logistics_envs.sim.utils import generate_colors, set_global_seeds
 
 logger = logging.getLogger("logistics_simulator")
 
@@ -51,6 +51,8 @@ class LogisticsSimulator:
             self._pygame_window = None
             self._pygame_clock = None
             self._pygame_font = None
+
+        set_global_seeds(self._config.seed)
 
         self._order_generator = getattr(
             order_generators, self._config.order_generator.generator_type
