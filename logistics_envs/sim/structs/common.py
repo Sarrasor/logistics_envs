@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import Enum
 
 import numpy as np
 
@@ -19,6 +20,11 @@ class Location:
 
     def near(self, other: "Location", threshold: float = 1e-4) -> bool:
         return abs(self.lat - other.lat) < threshold and abs(self.lon - other.lon) < threshold
+
+
+class LocationMode(str, Enum):
+    CARTESIAN = "CARTESIAN"  # Use locations as cartesian coordinates
+    GEOGRAPHIC = "GEOGRAPHIC"  # Use locations as geographic coordinates
 
 
 @dataclass

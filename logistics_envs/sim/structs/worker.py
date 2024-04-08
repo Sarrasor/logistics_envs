@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from logging import Logger
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 import numpy as np
 
@@ -14,9 +14,17 @@ from logistics_envs.sim.structs.action import (
     ServiceActionParameters,
     WorkerAction,
 )
-from logistics_envs.sim.structs.common import Location
-from logistics_envs.sim.structs.config import LocationMode, WorkerTravelType
+from logistics_envs.sim.structs.common import Location, LocationMode
 from logistics_envs.sim.structs.order import Order
+
+if TYPE_CHECKING:
+    from logistics_envs.sim.logistics_simulator import LogisticsSimulator
+
+
+class WorkerTravelType(str, Enum):
+    WALK = "WALK"
+    BIKE = "BIKE"
+    CAR = "CAR"
 
 
 class WorkerStatus(str, Enum):

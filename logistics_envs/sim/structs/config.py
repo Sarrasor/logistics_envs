@@ -1,68 +1,52 @@
-from dataclasses import dataclass
+from pydantic import BaseModel, PositiveFloat, NonNegativeFloat, PositiveInt, NonNegativeInt
 from enum import Enum
 from typing import Optional
 
-from logistics_envs.sim.structs.common import BoundingBox, Location
+from logistics_envs.sim.structs.common import BoundingBox, Location, LocationMode
+from logistics_envs.sim.structs.worker import WorkerTravelType
 
 
-class WorkerTravelType(str, Enum):
-    WALK = "WALK"
-    BIKE = "BIKE"
-    CAR = "CAR"
-
-
-@dataclass
-class WorkerConfig:
+class WorkerConfig(BaseModel):
     id: str
     initial_location: Location
     travel_type: WorkerTravelType
-    speed: float
+    speed: PositiveFloat
 
 
-class LocationMode(str, Enum):
-    CARTESIAN = "CARTESIAN"  # Use locations as cartesian coordinates
-    GEOGRAPHIC = "GEOGRAPHIC"  # Use locations as geographic coordinates
-
-
-@dataclass
-class OrderConfig:
+class OrderConfig(BaseModel):
     id: str
     client_id: str
     from_location: Location
     to_location: Location
-    creation_time: int
-    time_window: list[tuple[int, int]]
+    creation_time: NonNegativeInt
+    time_window: list[tuple[NonNegativeInt, NonNegativeInt]]
 
 
-@dataclass
-class PredefinedOrderGeneratorConfig:
+class PredefinedOrderGeneratorConfig(BaseModel):
     orders: list[OrderConfig]
 
 
-@dataclass
-class RandomOrderGeneratorConfig:
-    generation_probability: float
-    max_concurrent_orders: int
+class RandomOrderGeneratorConfig(BaseModel):
+    generation_probability: NonNegativeFloat
+    max_concurrent_orders: PositiveInt
     allow_same_location: bool
     lat_range: tuple[float, float]
     lon_range: tuple[float, float]
-    window_size: int
+    window_size: PositiveInt
 
 
-@dataclass
-class DepotRandomOrderGeneratorConfig:
-    order_generation_start_time: int
-    order_generation_end_time: int
-    generation_probability: float
-    max_concurrent_orders: int
+class DepotRandomOrderGeneratorConfig(BaseModel):
+    order_generation_start_time: NonNegativeInt
+    order_generation_end_time: NonNegativeInt
+    generation_probability: NonNegativeFloat
+    max_concurrent_orders: PositiveInt
     depot_location: Location
     lat_range: tuple[float, float]
     lon_range: tuple[float, float]
-    window_size: int
+    window_size: PositiveInt
 
 
-@dataclass
-class OrderGeneratorConfig:
+class OrderGeneratorConfig(BaseModel):
     generator_type: str
     config: (
         PredefinedOrderGeneratorConfig
@@ -78,30 +62,27 @@ class RenderMode(str, Enum):
     WEB = "WEB"
 
 
-@dataclass
-class PygameRenderConfig:
-    render_fps: int
-    window_size: tuple[int, int]
+class PygameRenderConfig(BaseModel):
+    render_fps: PositiveInt
+    window_size: tuple[PositiveInt, PositiveInt]
     hide_completed_orders: bool
     bounding_box: BoundingBox
 
 
-@dataclass
-class RenderConfig:
+class RenderConfig(BaseModel):
     render_mode: RenderMode
     config: Optional[PygameRenderConfig] = None
 
 
-@dataclass
-class LogisticsSimulatorConfig:
+class LogisticsSimulatorConfig(BaseModel):
     location_mode: LocationMode
     workers: list[WorkerConfig]
     order_generator: OrderGeneratorConfig
-    start_time: int
-    end_time: int
-    step_size: int
+    start_time: NonNegativeInt
+    end_time: NonNegativeInt
+    step_size: PositiveInt
     # TODO(dburakov): add pickup and drop_off samplers
-    order_pickup_time: int
-    order_drop_off_time: int
+    order_pickup_time: NonNegativeInt
+    order_drop_off_time: NonNegativeInt
     render: RenderConfig
     seed: Optional[int] = None

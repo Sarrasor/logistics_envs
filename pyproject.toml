@@ -11,6 +11,7 @@ gymnasium = "^0.29.1"
 pygame = "^2.5.2"
 matplotlib = "^3.8.4"
 numpy = "^1.26.4"
+pydantic = "^2.6.4"
 
 
 [tool.poetry.group.dev.dependencies]
