@@ -161,40 +161,30 @@ class QCommerceEnv(gym.Env):
 
         self.observation_space = spaces.Dict(
             {
-                "couriers": spaces.Dict(
-                    {
-                        "location": spaces.Box(
-                            low=0.0, high=1.0, shape=(self._n_couriers, 2), dtype=np.float32
-                        ),
-                        "status": spaces.MultiDiscrete([6] * self._n_couriers),
-                    }
+                "couriers_location": spaces.Box(
+                    low=0.0, high=1.0, shape=(self._n_couriers, 2), dtype=np.float32
                 ),
-                "depot": spaces.Dict(
-                    {"location": spaces.Box(low=0.0, high=1.0, shape=(2,), dtype=np.float32)}
+                "couriers_status": spaces.MultiDiscrete([6] * self._n_couriers),
+                "depot_location": spaces.Box(low=0.0, high=1.0, shape=(2,), dtype=np.float32),
+                "n_orders": spaces.Discrete(self._max_orders + 1),
+                "orders_from_location": spaces.Box(
+                    low=0.0, high=1.0, shape=(self._max_orders, 2), dtype=np.float32
                 ),
-                "orders": spaces.Dict(
-                    {
-                        "n_orders": spaces.Discrete(self._max_orders + 1),
-                        "from_location": spaces.Box(
-                            low=0.0, high=1.0, shape=(self._max_orders, 2), dtype=np.float32
-                        ),
-                        "to_location": spaces.Box(
-                            low=0.0, high=1.0, shape=(self._max_orders, 2), dtype=np.float32
-                        ),
-                        "status": spaces.MultiDiscrete([5] * self._max_orders),
-                        "creation_time": spaces.Box(
-                            low=0,
-                            high=self._end_time,
-                            shape=(self._max_orders, 1),
-                            dtype=np.int32,
-                        ),
-                        "time_window": spaces.Box(
-                            low=0,
-                            high=self._end_time,
-                            shape=(self._max_orders, 2),
-                            dtype=np.int32,
-                        ),
-                    }
+                "orders_to_location": spaces.Box(
+                    low=0.0, high=1.0, shape=(self._max_orders, 2), dtype=np.float32
+                ),
+                "orders_status": spaces.MultiDiscrete([5] * self._max_orders),
+                "orders_creation_time": spaces.Box(
+                    low=0,
+                    high=self._end_time,
+                    shape=(self._max_orders, 1),
+                    dtype=np.int32,
+                ),
+                "orders_time_window": spaces.Box(
+                    low=0,
+                    high=self._end_time,
+                    shape=(self._max_orders, 2),
+                    dtype=np.int32,
                 ),
             }
         )
@@ -261,12 +251,16 @@ class QCommerceEnv(gym.Env):
         return Action(worker_actions=worker_actions)
 
     def _convert_to_observation(self, sim_observation: Observation) -> dict:
-        orders = {
-            "from_location": np.zeros((self._max_orders, 2), dtype=np.float32),
-            "to_location": np.zeros((self._max_orders, 2), dtype=np.float32),
-            "status": np.zeros((self._max_orders,), dtype=np.int32),
-            "creation_time": np.zeros((self._max_orders, 1), dtype=np.int32),
-            "time_window": np.zeros((self._max_orders, 2), dtype=np.int32),
+        observation = {
+            "couriers_location": np.zeros((self._n_couriers, 2), dtype=np.float32),
+            "couriers_status": np.zeros((self._n_couriers,), dtype=np.int32),
+            "depot_location": self._depot_location.to_numpy(),
+            "n_orders": 0,
+            "orders_from_location": np.zeros((self._max_orders, 2), dtype=np.float32),
+            "orders_to_location": np.zeros((self._max_orders, 2), dtype=np.float32),
+            "orders_status": np.zeros((self._max_orders,), dtype=np.int32),
+            "orders_creation_time": np.zeros((self._max_orders, 1), dtype=np.int32),
+            "orders_time_window": np.zeros((self._max_orders, 2), dtype=np.int32),
         }
         self._order_id_to_index = bidict()
         n_orders = 0
@@ -279,31 +273,25 @@ class QCommerceEnv(gym.Env):
             self._order_id_to_index[order_observation.id] = order_index
 
             order_index = self._order_id_to_index[order_observation.id]
-            orders["from_location"][order_index] = order_observation.from_location.to_numpy()
-            orders["to_location"][order_index] = order_observation.to_location.to_numpy()
-            orders["status"][order_index] = order_observation.status.to_int()
-            orders["creation_time"][order_index] = order_observation.creation_time
-            orders["time_window"][order_index] = order_observation.time_window[0]
+            observation["orders_from_location"][order_index] = (
+                order_observation.from_location.to_numpy()
+            )
+            observation["orders_to_location"][order_index] = (
+                order_observation.to_location.to_numpy()
+            )
+            observation["orders_status"][order_index] = order_observation.status.to_int()
+            observation["orders_creation_time"][order_index] = order_observation.creation_time
+            observation["orders_time_window"][order_index] = order_observation.time_window[0]
 
             if n_orders >= self._max_orders:
                 # Truncate orders if there are more than max_orders
                 break
-        orders["n_orders"] = n_orders
+        observation["n_orders"] = n_orders
 
-        couriers = {
-            "location": np.zeros((self._n_couriers, 2), dtype=np.float32),
-            "status": np.zeros((self._n_couriers,), dtype=np.int32),
-        }
         for worker_observation in sim_observation.workers:
             worker_index = self._worker_id_to_index[worker_observation.id]
-            couriers["location"][worker_index] = worker_observation.location.to_numpy()
-            couriers["status"][worker_index] = worker_observation.status.to_int()
-
-        observation = {
-            "couriers": couriers,
-            "depot": {"location": self._depot_location.to_numpy()},
-            "orders": orders,
-        }
+            observation["couriers_location"][worker_index] = worker_observation.location.to_numpy()
+            observation["couriers_status"][worker_index] = worker_observation.status.to_int()
 
         return observation
 
