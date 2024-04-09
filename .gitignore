@@ -1,3 +1,6 @@
+osrm_files/
+valhalla_files/
+
 .vscode/
 
 # Byte-compiled / optimized / DLL files
