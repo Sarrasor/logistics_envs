@@ -6,7 +6,15 @@ Gym environments for logistics tasks that can be described as "Move something fr
 
 ### Q Commerce Environment
 
-Environment that models Q-commerce services
+Environment that models Q-commerce services on a unit (lat, lon) square
+
+![Q-commerce visualization](images/q_commerce.png)
+
+### Ride-hailing Environment
+
+Environment that models Ride-hailing services based on real Openstreetmap routes
+
+![Ride-hailing visualization](images/ride_hailing.png)
 
 ## How to install
 
@@ -83,3 +91,7 @@ Once the container is up and running, you can check whether everything is ok wit
 ```bash
 curl "http://localhost:5000/route/v1/car/-73.9557,40.7824;-73.9547,40.8211"
 ```
+
+### Visualization in geographic mode
+
+You can use [Logviz](https://github.com/Sarrasor/logistics_envs_visualizer)
