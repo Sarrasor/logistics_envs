@@ -7,7 +7,7 @@ from logistics_envs.sim.structs.common import Location
 
 
 @total_ordering
-class OrderStatus(Enum):
+class OrderStatus(str, Enum):
     CREATED = "CREATED"
     IN_PICKUP = "IN_PICKUP"
     IN_DELIVERY = "IN_DELIVERY"
@@ -90,12 +90,20 @@ class Order:
         return self._id
 
     @property
+    def client_id(self) -> str:
+        return self._client_id
+
+    @property
     def from_location(self) -> Location:
         return self._from_location
 
     @property
     def to_location(self) -> Location:
         return self._to_location
+
+    @property
+    def creation_time(self) -> int:
+        return self._creation_time
 
     @property
     def time_window(self) -> list[tuple[int, int]]:

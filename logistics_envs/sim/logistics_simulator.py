@@ -1,9 +1,13 @@
 import logging
+import uuid
 from typing import Optional
 
+import polyline
 import pygame
+import requests
 
 from logistics_envs.sim import order_generators
+from logistics_envs.sim.routing_provider import RoutingProvider
 from logistics_envs.sim.structs.action import Action
 from logistics_envs.sim.structs.common import Location
 from logistics_envs.sim.structs.config import (
@@ -11,6 +15,7 @@ from logistics_envs.sim.structs.config import (
     LogisticsSimulatorConfig,
     PygameRenderConfig,
     RenderMode,
+    WebRenderConfig,
 )
 from logistics_envs.sim.structs.info import Info
 from logistics_envs.sim.structs.observation import Observation
@@ -25,11 +30,23 @@ class LogisticsSimulator:
     def __init__(self, config: LogisticsSimulatorConfig) -> None:
         self._config = config
         self._location_mode = self._config.location_mode
+        if self._location_mode == LocationMode.GEOGRAPHIC:
+            if self._config.routing_provider is None:
+                raise ValueError("Geographic location mode requires routing provider config")
+
+            self._routing_provider = RoutingProvider(
+                engine_type=self._config.routing_provider.engine_type,
+                host=self._config.routing_provider.host,
+            )
+
         self._dt = self._config.step_size
+
         self._render_mode = self._config.render.render_mode
         if self._render_mode == RenderMode.PYGAME:
-            if self._config.render.config is None:
-                raise ValueError("Pygame render mode requires render config")
+            if not isinstance(self._config.render.config, PygameRenderConfig):
+                raise ValueError(
+                    f"Pygame render mode requires PygameRenderConfig, but got {self._config.render.config}"
+                )
 
             render_config: PygameRenderConfig = self._config.render.config
             self._render_fps = render_config.render_fps
@@ -51,6 +68,14 @@ class LogisticsSimulator:
             self._pygame_window = None
             self._pygame_clock = None
             self._pygame_font = None
+        elif self._render_mode == RenderMode.WEB:
+            if not isinstance(self._config.render.config, WebRenderConfig):
+                raise ValueError(
+                    f"Web render mode requires WebRenderConfig, but got {self._config.render.config}"
+                )
+            self._render_fps = self._config.render.config.render_fps
+            self._render_server_host = self._config.render.config.server_host
+            self._pygame_clock = None
 
         set_global_seeds(self._config.seed)
 
@@ -58,6 +83,7 @@ class LogisticsSimulator:
             order_generators, self._config.order_generator.generator_type
         )(self._config.order_generator.config)
 
+        self._simulation_id: str = ""
         self._workers: dict[str, Worker] = {}
         self._orders: dict[str, Order] = {}
         self._rewards: dict[int, float] = {}
@@ -73,6 +99,10 @@ class LogisticsSimulator:
     def step_size(self) -> int:
         return self._dt
 
+    @property
+    def routing_provider(self) -> Optional[RoutingProvider]:
+        return self._routing_provider
+
     def get_order(self, order_id: str) -> Order:
         if order_id not in self._orders:
             raise ValueError(f"Order {order_id} does not exist")
@@ -81,6 +111,7 @@ class LogisticsSimulator:
     def reset(self) -> tuple[Observation, Info]:
         logger.debug("Resetting simulator")
 
+        self._simulation_id = str(uuid.uuid4())
         self._current_time = self._config.start_time
         self._done = False
 
@@ -104,8 +135,7 @@ class LogisticsSimulator:
         for order in self._order_generator.generate(self._current_time):
             self._orders[order.id] = order
 
-        if self._render_mode == RenderMode.PYGAME:
-            self._render_frame()
+        self._render_frame()
 
         return self._get_current_observation(), self._get_current_info()
 
@@ -116,8 +146,7 @@ class LogisticsSimulator:
         self._update_state()
         reward = self._calculate_current_reward()
 
-        if self._render_mode == RenderMode.PYGAME:
-            self._render_frame()
+        self._render_frame()
 
         return (
             self._get_current_observation(),
@@ -269,9 +298,12 @@ class LogisticsSimulator:
         return current_reward
 
     def _render_frame(self) -> None:
-        if self._render_mode != RenderMode.PYGAME:
-            return
+        if self._render_mode == RenderMode.PYGAME:
+            self._render_pygame_frame()
+        elif self._render_mode == RenderMode.WEB:
+            self._render_web_frame()
 
+    def _render_pygame_frame(self) -> None:
         if self._pygame_window is None:
             pygame.init()
             self._pygame_window = pygame.display.set_mode(
@@ -340,6 +372,22 @@ class LogisticsSimulator:
 
         self._pygame_clock.tick(self._render_fps)
 
+    def _render_web_frame(self) -> None:
+        if self._pygame_clock is None:
+            self._pygame_clock = pygame.time.Clock()
+
+        json_data = self._render_json()
+        response = requests.post(
+            f"http://{self._render_server_host}/render", json=json_data, timeout=1.0
+        )
+
+        if response.status_code != 200:
+            raise RuntimeError(
+                f"Failed to render web frame. Response status code: {response.status_code}"
+            )
+
+        self._pygame_clock.tick(self._render_fps)
+
     def _location_to_coordinates(self, location: Location) -> tuple[int, int]:
         return (
             int((location.lon - self._zero_offset[0]) * self._x_scale),
@@ -347,4 +395,75 @@ class LogisticsSimulator:
         )
 
     def _render_json(self) -> dict:
-        raise NotImplementedError("JSON render mode is not implemented yet")
+        bounds = {"min": {"lat": 90.0, "lon": 180.0}, "max": {"lat": -90.0, "lon": -180.0}}
+        json_workers = []
+        for worker in self._workers.values():
+            encoded_path = None
+            remaining_path_index = None
+            worker_path = worker.path
+            if worker_path is not None:
+                if worker.route is not None:
+                    encoded_path = worker.route.geometry
+                    remaining_path_index = worker.remaining_path_index
+                else:
+                    raw_path = []
+                    for i, (time, location) in enumerate(worker_path.items()):
+                        self._update_bounds(bounds, location)
+                        raw_path.append((location.lat, location.lon))
+                        if remaining_path_index is None and time >= self._current_time:
+                            remaining_path_index = i
+                    encoded_path = polyline.encode(raw_path)
+
+            json_workers.append(
+                {
+                    "id": worker.id,
+                    "location": worker.location.to_dict(),
+                    "travel_type": worker.travel_type.value,
+                    "speed": worker.speed,
+                    "path": encoded_path,
+                    "remaining_path_index": remaining_path_index,
+                    "status": worker.status.value,
+                    "color": worker.color,
+                }
+            )
+
+        json_orders = []
+        for order in self._orders.values():
+            self._update_bounds(bounds, order.from_location)
+            self._update_bounds(bounds, order.to_location)
+            json_orders.append(
+                {
+                    "id": order.id,
+                    "client_id": order.client_id,
+                    "from_location": order.from_location.to_dict(),
+                    "to_location": order.to_location.to_dict(),
+                    "creation_time": order.creation_time,
+                    "time_window": order.time_window,
+                    "status": order.status.value,
+                }
+            )
+
+        json_observation = {
+            "current_time": self._current_time,
+            "bounds": bounds,
+            "workers": json_workers,
+            "orders": json_orders,
+        }
+        json_info = {
+            "simulation_id": self._simulation_id,
+            "start_time": self._config.start_time,
+            "end_time": self._config.end_time,
+        }
+
+        json_data = {
+            "observation": json_observation,
+            "info": json_info,
+        }
+
+        return json_data
+
+    def _update_bounds(self, bounds: dict, location: Location) -> None:
+        bounds["min"]["lat"] = min(bounds["min"]["lat"], location.lat)
+        bounds["min"]["lon"] = min(bounds["min"]["lon"], location.lon)
+        bounds["max"]["lat"] = max(bounds["max"]["lat"], location.lat)
+        bounds["max"]["lon"] = max(bounds["max"]["lon"], location.lon)

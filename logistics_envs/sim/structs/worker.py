@@ -14,7 +14,7 @@ from logistics_envs.sim.structs.action import (
     ServiceActionParameters,
     WorkerAction,
 )
-from logistics_envs.sim.structs.common import Location, LocationMode
+from logistics_envs.sim.structs.common import Location, LocationMode, Route
 from logistics_envs.sim.structs.order import Order
 
 if TYPE_CHECKING:
@@ -100,6 +100,10 @@ class Worker:
         self._picked_up_order_ids: set[str] = set()
         self._current_order_id: Optional[str] = None
 
+        self._route: Optional[Route] = None
+        self._remaining_path_indices: Optional[dict[int, int]] = None
+        self._remaining_path_index: Optional[int] = None
+
     @property
     def id(self) -> str:
         return self._id
@@ -111,6 +115,14 @@ class Worker:
     @property
     def location(self) -> Location:
         return self._location
+
+    @property
+    def travel_type(self) -> WorkerTravelType:
+        return self._travel_type
+
+    @property
+    def speed(self) -> float:
+        return self._speed
 
     @property
     def color(self) -> str:
@@ -127,6 +139,14 @@ class Worker:
     @property
     def path(self) -> Optional[dict[int, Location]]:
         return self._path
+
+    @property
+    def route(self) -> Optional[Route]:
+        return self._route
+
+    @property
+    def remaining_path_index(self) -> Optional[int]:
+        return self._remaining_path_index
 
     def update_state(self, current_time: int) -> None:
         match self._status:
@@ -158,6 +178,10 @@ class Worker:
             raise ValueError("Worker is in moving state, but busy_until is not set")
 
         self._location = self._path[current_time]
+        if self._sim.location_mode == LocationMode.GEOGRAPHIC:
+            if self._remaining_path_indices is None:
+                raise ValueError("Worker is in moving state, but remaining_path_indices is not set")
+            self._remaining_path_index = self._remaining_path_indices[current_time]
 
         if current_time >= self._busy_until:
             match self._status:
@@ -213,6 +237,11 @@ class Worker:
         self._status = WorkerStatus.IDLE
         self._busy_until = None
         self._path = None
+
+        if self._sim.location_mode == LocationMode.GEOGRAPHIC:
+            self._route = None
+            self._remaining_path_indices = None
+            self._remaining_path_index = None
 
     def get_observation(self) -> WorkerObservation:
         return WorkerObservation(
@@ -273,8 +302,10 @@ class Worker:
     def _move(self, location: Location, current_time: int, moving_status: WorkerStatus) -> None:
         if self._sim.location_mode == LocationMode.CARTESIAN:
             path, busy_until = self._generate_cartesian_path(location, current_time)
-        else:
+        elif self._sim.location_mode == LocationMode.GEOGRAPHIC:
             path, busy_until = self._generate_geographic_path(location, current_time)
+        else:
+            raise ValueError(f"Unknown location mode {self._sim.location_mode}")
 
         self._path = path
         self._busy_until = busy_until
@@ -293,7 +324,7 @@ class Worker:
         from_location = self._location.to_numpy()
         to_location = location.to_numpy()
         distance = np.linalg.norm(from_location - to_location)
-        dt = self._sim._dt
+        dt = self._sim.step_size
         travel_time = np.ceil(distance / (dt * self._speed)) * dt
         finish_time = current_time + travel_time
         n_steps = int(travel_time // dt) + 1
@@ -319,7 +350,71 @@ class Worker:
     def _generate_geographic_path(
         self, location: Location, current_time: int
     ) -> tuple[dict[int, Location], int]:
-        raise NotImplementedError("Geographic path generation is not implemented")
+        if self._sim.routing_provider is None:
+            raise ValueError("Routing provider is not set")
+        route = self._sim.routing_provider.get_route(self._location, location, self._travel_type)
+
+        # TODO(dburakov): For now geographic mode assumes time is in minutes
+        dt = self._sim.step_size
+        travel_time = int(np.ceil(route.time_seconds / 60.0))
+        finish_time = current_time + travel_time
+        n_steps = int(travel_time // dt) + 1
+
+        self._logger.debug(
+            f"Generating cartesian path from {self._location} to {location} Distance: {route.length_meters} meters Current time: {current_time} Travel time: {travel_time} Finish time: {finish_time} N steps: {n_steps}"
+        )
+
+        times = np.linspace(current_time, finish_time, n_steps)
+
+        points = route.get_points()
+        # Make sure the final location is as requested
+        points[-1] = location
+
+        point_distances = []
+        total_distance = 0.0
+        for curr_point, next_point in zip(points, points[1:]):
+            point_distances.append(total_distance)
+            total_distance += curr_point.distance_to(next_point)
+
+        times_per_point = []
+        for distance in point_distances:
+            time_at_point = current_time + distance / total_distance * travel_time
+            times_per_point.append(time_at_point)
+
+        remaining_path_indices = {}
+        path = {}
+        for cur_t in times:
+            nearest_point_idx = int(np.searchsorted(times_per_point, cur_t, side="left"))
+            remaining_path_indices[cur_t] = nearest_point_idx
+            if nearest_point_idx == len(times_per_point):
+                cur_lat, cur_lon = points[-1].lat, points[-1].lon
+            else:
+                prev_point_idx = max(nearest_point_idx - 1, 0)
+                nearest_time = times_per_point[nearest_point_idx]
+                prev_time = times_per_point[prev_point_idx]
+                if abs(nearest_time - prev_time) < 1e-6:
+                    interpolation_factor = 0.0
+                else:
+                    interpolation_factor = (cur_t - prev_time) / (nearest_time - prev_time)
+                cur_lat = points[prev_point_idx].lat + interpolation_factor * (
+                    points[nearest_point_idx].lat - points[prev_point_idx].lat
+                )
+                cur_lon = points[prev_point_idx].lon + interpolation_factor * (
+                    points[nearest_point_idx].lon - points[prev_point_idx].lon
+                )
+
+            path[cur_t] = Location(lat=cur_lat, lon=cur_lon)
+
+        # For the case, when there is a request to move from a position to the same position
+        if len(path) == 1:
+            path[times[-1] + dt] = path[times[-1]]
+            remaining_path_indices[times[-1] + dt] = remaining_path_indices[times[-1]]
+
+        self._route = route
+        self._remaining_path_indices = remaining_path_indices
+        self._remaining_path_index = remaining_path_indices[current_time]
+
+        return path, finish_time
 
     def _pickup(self, order_id: str, current_time: int) -> None:
         self._logger.debug(f"Worker {self._id} is picking up order {order_id}")

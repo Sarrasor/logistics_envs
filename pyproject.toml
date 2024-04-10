@@ -12,6 +12,9 @@ pygame = "^2.5.2"
 numpy = "^1.26.4"
 pydantic = "^2.6.4"
 bidict = "^0.23.1"
+requests = "^2.31.0"
+polyline = "^2.0.2"
+geopy = "^2.4.1"
 
 
 [tool.poetry.group.dev.dependencies]

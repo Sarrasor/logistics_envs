@@ -11,6 +11,7 @@ from pydantic import (
 
 from logistics_envs.sim.structs.common import BoundingBox, Location, LocationMode
 from logistics_envs.sim.structs.worker import WorkerTravelType
+from logistics_envs.sim.routing_provider import RoutingEngineType
 
 
 class WorkerConfig(BaseModel):
@@ -76,9 +77,19 @@ class PygameRenderConfig(BaseModel):
     bounding_box: BoundingBox
 
 
+class WebRenderConfig(BaseModel):
+    render_fps: PositiveInt
+    server_host: str
+
+
 class RenderConfig(BaseModel):
     render_mode: RenderMode
-    config: Optional[PygameRenderConfig] = None
+    config: Optional[PygameRenderConfig | WebRenderConfig] = None
+
+
+class RoutingProviderConfig(BaseModel):
+    engine_type: RoutingEngineType
+    host: str
 
 
 class LogisticsSimulatorConfig(BaseModel):
@@ -92,4 +103,5 @@ class LogisticsSimulatorConfig(BaseModel):
     order_pickup_time: NonNegativeInt
     order_drop_off_time: NonNegativeInt
     render: RenderConfig
+    routing_provider: Optional[RoutingProviderConfig] = None
     seed: Optional[int] = None
