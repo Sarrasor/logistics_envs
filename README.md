@@ -4,15 +4,20 @@ Gym environments for logistics tasks that can be described as "Move something fr
 
 ## Environments
 
+Each environment can be used in two modes:
+
+- `CARTESIAN` - locations are constrained to be on a unit square lat ∈ [0.0, 1.0], lon ∈ [0.0, 1.0]. This mode uses straight-line routing and L2 distances
+- `GEOGRAPHIC` - locations are considered to be valid coordinates lat ∈ [-90.0, 90.0], lon ∈ [-180.0, 180.0]. This mode uses real routes from Openstreetmap. Please, check the **Geographic mode** section below for more information
+
 ### Q Commerce Environment
 
-Environment that models Q-commerce services on a unit (lat, lon) square
+Environment that models Q-commerce services
 
 ![Q-commerce visualization](images/q_commerce.png)
 
 ### Ride-hailing Environment
 
-Environment that models Ride-hailing services based on real Openstreetmap routes
+Environment that models Ride-hailing services
 
 ![Ride-hailing visualization](images/ride_hailing.png)
 
@@ -28,6 +33,8 @@ Geographic mode uses Valhalla or OSRM routing engines to create routes for worke
 
 - Valhalla is recommended for dynamic maps and different types of workers
 - OSRM is recommended for static maps and large time/distance matrices
+
+Make sure to set `PBF_FILE` and `DOWNLOAD_LINK` in the `Makefile` to your geographic region
 
 #### Valhalla
 
