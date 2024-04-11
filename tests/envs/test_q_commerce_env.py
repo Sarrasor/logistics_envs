@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import gymnasium as gym
 
-from logistics_envs.envs.q_commerce_env import QCommerceEnv
+from logistics_envs.envs import QCommerceEnv
 from logistics_envs.sim import LocationMode
 
 
