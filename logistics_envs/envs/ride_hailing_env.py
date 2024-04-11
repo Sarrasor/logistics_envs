@@ -1,26 +1,32 @@
+import pathlib
 from typing import Optional
 
 import numpy as np
 from bidict import bidict
 from gymnasium import spaces
+import pandas as pd
 
 from logistics_envs.envs.logistics_sim_wrapper_env import LogisticsSimWrapperEnv
-from logistics_envs.sim import (
+from logistics_envs.sim.routing_provider import RoutingEngineType
+from logistics_envs.sim.structs.action import (
     Action,
     ActionType,
     DeliverActionParameters,
-    Info,
-    Location,
-    LocationMode,
-    LogisticsSimulatorConfig,
     MoveActionParameters,
-    Observation,
     SpecificWorkerAction,
     WorkerAction,
 )
+from logistics_envs.sim.structs.common import Location, LocationMode
+from logistics_envs.sim.structs.config import (
+    LogisticsSimulatorConfig,
+    OrderConfig,
+    RoutingProviderConfig,
+)
+from logistics_envs.sim.structs.info import Info
+from logistics_envs.sim.structs.observation import Observation
 
 
-class QCommerceEnv(LogisticsSimWrapperEnv):
+class RideHailingEnv(LogisticsSimWrapperEnv):
     metadata = {"render_modes": ["human"], "render_fps": 30}
 
     def __init__(
@@ -29,25 +35,19 @@ class QCommerceEnv(LogisticsSimWrapperEnv):
         start_time: int,
         end_time: int,
         time_step: int,
-        depot_location: tuple[float, float],
-        n_couriers: int,
-        courier_speed: float,
+        n_drivers: int,
         max_orders: int,
-        order_window_size: int,
+        order_data_path: str,
         order_pickup_time: int,
         order_drop_off_time: int,
-        order_generation_start_time: int,
-        order_generation_end_time: int,
-        order_generation_probability: float,
-        max_concurrent_orders: int,
         routing_host: Optional[str] = None,
         seed: Optional[int] = None,
         render_mode: Optional[str] = None,
         render_host: Optional[str] = None,
-    ):
-        if mode != LocationMode.CARTESIAN:
+    ) -> None:
+        if mode != LocationMode.GEOGRAPHIC:
             raise ValueError(
-                f"mode={mode} is not supported. Only CARTESIAN mode is supported currently"
+                f"mode={mode} is not supported. Only GEOGRAPHIC mode is supported currently"
             )
         self._mode = mode
 
@@ -60,47 +60,25 @@ class QCommerceEnv(LogisticsSimWrapperEnv):
         if time_step < 1:
             raise ValueError(f"time_step={time_step} must be greater than 0")
         self._time_step = time_step
-        self._depot_location = Location(lat=depot_location[0], lon=depot_location[1])
 
-        if n_couriers < 1:
-            raise ValueError(f"n_couriers={n_couriers} must be greater than 0")
-        self._n_couriers = n_couriers
-        if courier_speed <= 0.0:
-            raise ValueError(f"courier_speed={courier_speed} must be greater than 0")
-        self._courier_speed = courier_speed
+        if n_drivers < 1:
+            raise ValueError(f"n_drivers={n_drivers} must be greater than 0")
+        self._n_drivers = n_drivers
 
         if max_orders < 1:
             raise ValueError(f"max_orders={max_orders} must be greater than 0")
         self._max_orders = max_orders
-        if order_window_size < 1:
-            raise ValueError(f"order_window_size={order_window_size} must be greater than 0")
-        self._order_window_size = order_window_size
+
+        data_path = pathlib.Path(order_data_path)
+        if not data_path.exists() or not data_path.suffix == ".csv":
+            raise ValueError(f"order_data_path={order_data_path} must be a valid csv file")
+        self._order_data_path = order_data_path
         if order_pickup_time < 1:
             raise ValueError(f"order_pickup_time={order_pickup_time} must be greater than 0")
         self._order_pickup_time = order_pickup_time
         if order_drop_off_time < 1:
             raise ValueError(f"order_drop_off_time={order_drop_off_time} must be greater than 0")
         self._order_drop_off_time = order_drop_off_time
-        if order_generation_start_time < self._start_time:
-            raise ValueError(
-                f"order_generation_start_time={order_generation_start_time} must be greater than or equal to start_time={self._start_time}"
-            )
-        self._order_generation_start_time = order_generation_start_time
-        if order_generation_end_time > self._end_time:
-            raise ValueError(
-                f"order_generation_end_time={order_generation_end_time} must be less than or equal to end_time={self._end_time}"
-            )
-        self._order_generation_end_time = order_generation_end_time
-        if order_generation_probability < 0.0 or order_generation_probability > 1.0:
-            raise ValueError(
-                f"order_generation_probability={order_generation_probability} must be in the range [0, 1]"
-            )
-        self._order_generation_probability = order_generation_probability
-        if max_concurrent_orders < 1:
-            raise ValueError(
-                f"max_concurrent_orders={max_concurrent_orders} must be greater than 0"
-            )
-        self._max_concurrent_orders = max_concurrent_orders
 
         self._routing_host = routing_host
 
@@ -115,49 +93,68 @@ class QCommerceEnv(LogisticsSimWrapperEnv):
         self._worker_id_to_index: bidict[str, int] = bidict()
         self._order_id_to_index: bidict[str, int] = bidict()
 
+        orders_data = pd.read_csv(self._order_data_path)
+
         workers_config = []
-        for worker_index in range(self._n_couriers):
-            worker_id = f"courier_{worker_index}"
+        for worker_index in range(self._n_drivers):
+            worker_id = f"driver_{worker_index}"
             self._worker_id_to_index[worker_id] = worker_index
+            random_row = orders_data.sample().iloc[0]
             workers_config.append(
                 {
                     "id": worker_id,
-                    "initial_location": self._depot_location.to_dict(),
-                    "travel_type": "WALK",
-                    "speed": self._courier_speed,
+                    "initial_location": {
+                        "lat": random_row["from_lat"],
+                        "lon": random_row["from_lon"],
+                    },
+                    "travel_type": "CAR",
+                    "speed": 1.0,
                 }
             )
 
+        orders_config = []
+        for i, order in orders_data.iterrows():
+            orders_config.append(
+                OrderConfig(
+                    id=f"order_{i}",
+                    client_id=f"client_{i}",
+                    from_location=Location(lat=order["from_lat"], lon=order["from_lon"]),
+                    to_location=Location(lat=order["to_lat"], lon=order["to_lon"]),
+                    creation_time=order["creation_time"],
+                    time_window=[(order["creation_time"], order["creation_time"])],
+                ),
+            )
+
         if self.render_mode == "human":
+            if self._render_host is None:
+                raise ValueError("render_host must be provided when render_mode is human")
             render_config = {
-                "render_mode": "PYGAME",
+                "render_mode": "WEB",
                 "config": {
                     "render_fps": self.metadata["render_fps"],
-                    "window_size": (1000, 1000),
-                    "hide_completed_orders": True,
-                    "bounding_box": {
-                        "bottom_left": {"lat": 0.0, "lon": 0.0},
-                        "top_right": {"lat": 1.0, "lon": 1.0},
-                    },
+                    "server_host": self._render_host,
                 },
             }
         else:
             render_config = {"render_mode": "NONE", "config": None}
 
+        if self._mode == LocationMode.GEOGRAPHIC:
+            if self._routing_host is None:
+                raise ValueError("routing_host must be provided when mode is GEOGRAPHIC")
+            routing_provider_config = RoutingProviderConfig(
+                engine_type=RoutingEngineType.VALHALLA,
+                host=self._routing_host,
+            )
+        else:
+            routing_provider_config = None
+
         config = {
             "location_mode": self._mode.value,
             "workers": workers_config,
             "order_generator": {
-                "generator_type": "DepotRandomOrderGenerator",
+                "generator_type": "PredefinedOrderGenerator",
                 "config": {
-                    "order_generation_start_time": self._order_generation_start_time,
-                    "order_generation_end_time": self._order_generation_end_time,
-                    "generation_probability": self._order_generation_probability,
-                    "max_concurrent_orders": self._max_concurrent_orders,
-                    "depot_location": self._depot_location.to_dict(),
-                    "lat_range": (0.0, 1.0),
-                    "lon_range": (0.0, 1.0),
-                    "window_size": self._order_window_size,
+                    "orders": orders_config,
                 },
             },
             "start_time": self._start_time,
@@ -166,24 +163,38 @@ class QCommerceEnv(LogisticsSimWrapperEnv):
             "order_pickup_time": self._order_pickup_time,
             "order_drop_off_time": self._order_drop_off_time,
             "render": render_config,
+            "routing_provider": routing_provider_config,
             "seed": self._seed,
         }
         config = LogisticsSimulatorConfig(**config)
         super().__init__(config)
 
+        if self._mode == LocationMode.GEOGRAPHIC:
+            # Lat in [-90, 90], lon in [-180, 180]
+            location_min = np.array([[-90.0, -180.0]], dtype=np.float32)
+            location_max = np.array([[90.0, 180.0]], dtype=np.float32)
+        else:
+            location_min = np.array([[0.0, 0.0]], dtype=np.float32)
+            location_max = np.array([[1.0, 1.0]], dtype=np.float32)
+
         self.observation_space = spaces.Dict(
             {
-                "couriers_location": spaces.Box(
-                    low=0.0, high=1.0, shape=(self._n_couriers, 2), dtype=np.float32
+                "drivers_location": spaces.Box(
+                    low=np.repeat(location_min, self._n_drivers, 0),
+                    high=np.repeat(location_max, self._n_drivers, 0),
+                    dtype=np.float32,
                 ),
-                "couriers_status": spaces.MultiDiscrete([6] * self._n_couriers),
-                "depot_location": spaces.Box(low=0.0, high=1.0, shape=(2,), dtype=np.float32),
+                "drivers_status": spaces.MultiDiscrete([6] * self._n_drivers),
                 "n_orders": spaces.Discrete(self._max_orders + 1),
                 "orders_from_location": spaces.Box(
-                    low=0.0, high=1.0, shape=(self._max_orders, 2), dtype=np.float32
+                    low=np.repeat(location_min, self._max_orders, 0),
+                    high=np.repeat(location_max, self._max_orders, 0),
+                    dtype=np.float32,
                 ),
                 "orders_to_location": spaces.Box(
-                    low=0.0, high=1.0, shape=(self._max_orders, 2), dtype=np.float32
+                    low=np.repeat(location_min, self._max_orders, 0),
+                    high=np.repeat(location_max, self._max_orders, 0),
+                    dtype=np.float32,
                 ),
                 "orders_status": spaces.MultiDiscrete([5] * self._max_orders),
                 "orders_creation_time": spaces.Box(
@@ -192,23 +203,19 @@ class QCommerceEnv(LogisticsSimWrapperEnv):
                     shape=(self._max_orders, 1),
                     dtype=np.int32,
                 ),
-                "orders_time_window": spaces.Box(
-                    low=0,
-                    high=self._end_time,
-                    shape=(self._max_orders, 2),
-                    dtype=np.int32,
-                ),
             }
         )
-        # action: Primary action. One of: {0=NOOP, 1=MOVE, 2=DELIVER}
-        # target: Target order index for MOVE and DELIVER actions, can be arbitrary for NOOP
-        # Location for MOVE action, can be arbitrary for NOOP and DELIVER
+        # action: Primary action. One of: {0=NOOP, 1=MOVE, 2=SERVE}
+        # target: Target order index for MOVE and SERVE actions, can be arbitrary for NOOP
+        # Location for MOVE action, can be arbitrary for NOOP and SERVE
         self.action_space = spaces.Dict(
             {
-                "action": spaces.MultiDiscrete([3] * self._n_couriers),
-                "target": spaces.MultiDiscrete([self._max_orders] * self._n_couriers),
+                "action": spaces.MultiDiscrete([3] * self._n_drivers),
+                "target": spaces.MultiDiscrete([self._max_orders] * self._n_drivers),
                 "location": spaces.Box(
-                    low=0.0, high=1.0, shape=(self._n_couriers, 2), dtype=np.float32
+                    low=np.repeat(location_min, self._n_drivers, 0),
+                    high=np.repeat(location_max, self._n_drivers, 0),
+                    dtype=np.float32,
                 ),
             }
         )
@@ -249,15 +256,13 @@ class QCommerceEnv(LogisticsSimWrapperEnv):
 
     def _convert_to_observation(self, sim_observation: Observation) -> dict:
         observation = {
-            "couriers_location": np.zeros((self._n_couriers, 2), dtype=np.float32),
-            "couriers_status": np.zeros((self._n_couriers,), dtype=np.int32),
-            "depot_location": self._depot_location.to_numpy(),
+            "drivers_location": np.zeros((self._n_drivers, 2), dtype=np.float32),
+            "drivers_status": np.zeros((self._n_drivers,), dtype=np.int32),
             "n_orders": 0,
             "orders_from_location": np.zeros((self._max_orders, 2), dtype=np.float32),
             "orders_to_location": np.zeros((self._max_orders, 2), dtype=np.float32),
             "orders_status": np.zeros((self._max_orders,), dtype=np.int32),
             "orders_creation_time": np.zeros((self._max_orders, 1), dtype=np.int32),
-            "orders_time_window": np.zeros((self._max_orders, 2), dtype=np.int32),
         }
         self._order_id_to_index = bidict()
         n_orders = 0
@@ -278,7 +283,6 @@ class QCommerceEnv(LogisticsSimWrapperEnv):
             )
             observation["orders_status"][order_index] = order_observation.status.to_int()
             observation["orders_creation_time"][order_index] = order_observation.creation_time
-            observation["orders_time_window"][order_index] = order_observation.time_window[0]
 
             if n_orders >= self._max_orders:
                 # Truncate orders if there are more than max_orders
@@ -287,10 +291,16 @@ class QCommerceEnv(LogisticsSimWrapperEnv):
 
         for worker_observation in sim_observation.workers:
             worker_index = self._worker_id_to_index[worker_observation.id]
-            observation["couriers_location"][worker_index] = worker_observation.location.to_numpy()
-            observation["couriers_status"][worker_index] = worker_observation.status.to_int()
+            observation["drivers_location"][worker_index] = worker_observation.location.to_numpy()
+            observation["drivers_status"][worker_index] = worker_observation.status.to_int()
 
         return observation
 
     def _convert_to_info(self, sim_info: Info) -> dict:
         return {"order_index_to_id": dict(self._order_id_to_index.inverse)}
+
+    def render(self) -> Optional[dict]:
+        return self._sim.render()
+
+    def close(self):
+        self._sim.close()

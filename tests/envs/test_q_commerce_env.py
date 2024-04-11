@@ -3,11 +3,13 @@ import pytest
 import gymnasium as gym
 
 from logistics_envs.envs.q_commerce_env import QCommerceEnv
+from logistics_envs.sim import LocationMode
 
 
 @pytest.fixture
 def env() -> QCommerceEnv:
     config = {
+        "mode": LocationMode.CARTESIAN,
         "start_time": 100,
         "end_time": 300,
         "time_step": 1,

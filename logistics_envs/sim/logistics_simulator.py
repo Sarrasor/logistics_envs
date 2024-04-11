@@ -148,11 +148,18 @@ class LogisticsSimulator:
 
         self._render_frame()
 
+        truncated = False
+        if self._done:
+            has_uncompleted_orders = any(
+                order.status != OrderStatus.COMPLETED for order in self._orders.values()
+            )
+            truncated = has_uncompleted_orders
+
         return (
             self._get_current_observation(),
             reward,
             self._done,
-            False,  # For now assume no truncation
+            truncated,
             self._get_current_info(),
         )
 
@@ -262,6 +269,8 @@ class LogisticsSimulator:
             return
 
         for order in self._orders.values():
+            if order.status == OrderStatus.COMPLETED:
+                continue
             order.update_state(self._current_time)
 
         for worker in self._workers.values():
@@ -398,6 +407,7 @@ class LogisticsSimulator:
         bounds = {"min": {"lat": 90.0, "lon": 180.0}, "max": {"lat": -90.0, "lon": -180.0}}
         json_workers = []
         for worker in self._workers.values():
+            self._update_bounds(bounds, worker.location)
             encoded_path = None
             remaining_path_index = None
             worker_path = worker.path
@@ -429,6 +439,9 @@ class LogisticsSimulator:
 
         json_orders = []
         for order in self._orders.values():
+            if order.status == OrderStatus.COMPLETED:
+                continue
+
             self._update_bounds(bounds, order.from_location)
             self._update_bounds(bounds, order.to_location)
             json_orders.append(
