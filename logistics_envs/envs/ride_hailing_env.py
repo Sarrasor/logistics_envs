@@ -196,7 +196,7 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
                     high=np.repeat(location_max, self._max_orders, 0),
                     dtype=np.float32,
                 ),
-                "orders_status": spaces.MultiDiscrete([5] * self._max_orders),
+                "orders_status": spaces.MultiDiscrete([6] * self._max_orders),
                 "orders_creation_time": spaces.Box(
                     low=0,
                     high=self._end_time,
@@ -297,7 +297,7 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
         return observation
 
     def _convert_to_info(self, sim_info: Info) -> dict:
-        return {"order_index_to_id": dict(self._order_id_to_index.inverse)}
+        return {}
 
     def render(self) -> Optional[dict]:
         return self._sim.render()

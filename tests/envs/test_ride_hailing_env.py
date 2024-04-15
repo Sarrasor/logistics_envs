@@ -72,7 +72,7 @@ def test_idle_action(env: RideHailingEnv) -> None:
         assert observation["orders_status"][order_index] == 0
 
 
-def get_fifo_deliver_action(observation: dict, info: dict, assigned_orders: set) -> dict:
+def get_fifo_deliver_action(observation: dict) -> dict:
     n_drivers = len(observation["drivers_status"])
     action = {
         "action": [0] * n_drivers,
@@ -80,18 +80,18 @@ def get_fifo_deliver_action(observation: dict, info: dict, assigned_orders: set)
         "location": [0.0, 0.0] * n_drivers,
     }
 
+    assigned_orders = set()
     n_orders = observation["n_orders"]
     for driver_index in range(n_drivers):
         if observation["drivers_status"][driver_index] == 0:
             for order_index in range(n_orders):
-                order_id = info["order_index_to_id"][order_index]
                 if (
                     observation["orders_status"][order_index] == 0
-                    and order_id not in assigned_orders
+                    and order_index not in assigned_orders
                 ):
                     action["action"][driver_index] = 2
                     action["target"][driver_index] = order_index
-                    assigned_orders.add(order_id)
+                    assigned_orders.add(order_index)
                     break
 
     return action
@@ -103,9 +103,8 @@ def test_deliver(env: RideHailingEnv) -> None:
     total_orders += observation["n_orders"]
     done = False
 
-    assigned_orders = set()
     while not done:
-        action = get_fifo_deliver_action(observation, info, assigned_orders)
+        action = get_fifo_deliver_action(observation)
         observation, reward, done, truncated, info = env.step(action)
         total_orders += observation["n_orders"]
 

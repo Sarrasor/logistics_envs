@@ -114,26 +114,25 @@ def test_move_action(env: QCommerceEnv) -> None:
         assert np.allclose(last_observation["couriers_location"][courier_index], [0.1, 0.2])
 
 
-def get_fifo_deliver_action(observation: dict, info: dict, assigned_orders: set) -> dict:
+def get_fifo_deliver_action(observation: dict) -> dict:
     n_couriers = len(observation["couriers_status"])
     action = {
         "action": [0] * n_couriers,
         "target": [0] * n_couriers,
         "location": [0.0, 0.0] * n_couriers,
     }
-
+    assigned_orders = set()
     n_orders = observation["n_orders"]
     for courier_index in range(n_couriers):
         if observation["couriers_status"][courier_index] == 0:
             for order_index in range(n_orders):
-                order_id = info["order_index_to_id"][order_index]
                 if (
                     observation["orders_status"][order_index] == 0
-                    and order_id not in assigned_orders
+                    and order_index not in assigned_orders
                 ):
                     action["action"][courier_index] = 2
                     action["target"][courier_index] = order_index
-                    assigned_orders.add(order_id)
+                    assigned_orders.add(order_index)
                     break
 
     return action
@@ -145,9 +144,8 @@ def test_deliver(env: QCommerceEnv) -> None:
     total_orders += observation["n_orders"]
     done = False
 
-    assigned_orders = set()
     while not done:
-        action = get_fifo_deliver_action(observation, info, assigned_orders)
+        action = get_fifo_deliver_action(observation)
         observation, reward, done, truncated, info = env.step(action)
         total_orders += observation["n_orders"]
 

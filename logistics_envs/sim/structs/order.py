@@ -9,6 +9,7 @@ from logistics_envs.sim.structs.common import Location
 @total_ordering
 class OrderStatus(str, Enum):
     CREATED = "CREATED"
+    ASSIGNED = "ASSIGNED"
     IN_PICKUP = "IN_PICKUP"
     IN_DELIVERY = "IN_DELIVERY"
     IN_DROP_OFF = "IN_DROP_OFF"
@@ -21,14 +22,16 @@ class OrderStatus(str, Enum):
         match status_str:
             case "CREATED":
                 return 0
-            case "IN_PICKUP":
+            case "ASSIGNED":
                 return 1
-            case "IN_DELIVERY":
+            case "IN_PICKUP":
                 return 2
-            case "IN_DROP_OFF":
+            case "IN_DELIVERY":
                 return 3
-            case "COMPLETED":
+            case "IN_DROP_OFF":
                 return 4
+            case "COMPLETED":
+                return 5
             case _:
                 raise ValueError(f"Unknown status string: {status_str}")
 
@@ -120,6 +123,10 @@ class Order:
     @property
     def assigned_worker_id(self) -> Optional[str]:
         return self._assigned_worker_id
+
+    def assign(self, worker_id: str) -> None:
+        self._assigned_worker_id = worker_id
+        self._status = OrderStatus.ASSIGNED
 
     def pickup(self, worker_id: str, pickup_start_time: int, pickup_end_time: int) -> None:
         self._assigned_worker_id = worker_id

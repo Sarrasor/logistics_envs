@@ -173,16 +173,30 @@ class LogisticsSimulator:
                 pygame.display.quit()
                 pygame.quit()
 
-    def pickup_order(self, order_id: str, worker_id: str) -> int:
+    def assign_order(self, order_id: str, worker_id: str) -> None:
         self._basic_check(order_id, worker_id)
         order = self._orders[order_id]
 
         if order.status != OrderStatus.CREATED:
-            raise ValueError(f"Cannot pick up order {order_id} with status {order.status}")
+            raise ValueError(f"Cannot assign order {order_id} with status {order.status}")
 
         if order.assigned_worker_id is not None:
             raise ValueError(
                 f"Order {order_id} is already assigned to worker {order.assigned_worker_id}"
+            )
+
+        order.assign(worker_id)
+
+    def pickup_order(self, order_id: str, worker_id: str) -> int:
+        self._basic_check(order_id, worker_id)
+        order = self._orders[order_id]
+
+        if order.status != OrderStatus.ASSIGNED:
+            raise ValueError(f"Cannot pick up order {order_id} with status {order.status}")
+
+        if order.assigned_worker_id != worker_id:
+            raise ValueError(
+                f"Order {order_id} is not assigned to worker {worker_id}. Current assignment: {order.assigned_worker_id}"
             )
 
         worker = self._workers[worker_id]

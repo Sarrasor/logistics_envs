@@ -15,7 +15,7 @@ from logistics_envs.sim.structs.action import (
     WorkerAction,
 )
 from logistics_envs.sim.structs.common import Location, LocationMode, Route
-from logistics_envs.sim.structs.order import Order
+from logistics_envs.sim.structs.order import Order, OrderStatus
 
 if TYPE_CHECKING:
     from logistics_envs.sim.logistics_simulator import LogisticsSimulator
@@ -419,6 +419,8 @@ class Worker:
     def _pickup(self, order_id: str, current_time: int) -> None:
         self._logger.debug(f"Worker {self._id} is picking up order {order_id}")
         order: Order = self._sim.get_order(order_id)
+        if order.status != OrderStatus.ASSIGNED:
+            self._sim.assign_order(order.id, self.id)
         self._current_order_id = order_id
 
         if not self._location.near(order.from_location):
