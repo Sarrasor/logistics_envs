@@ -117,6 +117,10 @@ class Order:
         return self._status
 
     @property
+    def pickup_start_time(self) -> Optional[int]:
+        return self._pickup_start_time
+
+    @property
     def completion_time(self) -> Optional[int]:
         return self._completion_time
 

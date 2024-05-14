@@ -312,7 +312,9 @@ class LogisticsSimulator:
                 current_reward += max(start_penalty, end_penalty)
 
             if self._done and order.status != OrderStatus.COMPLETED:
-                current_reward += 1e6
+                start_penalty = max(0, order.time_window[0][0] - self._current_time)
+                end_penalty = max(0, self._current_time - order.time_window[0][1])
+                current_reward += max(start_penalty, end_penalty)
 
         # Reward is negative since it is a penalty
         current_reward = -1.0 * current_reward
@@ -452,9 +454,18 @@ class LogisticsSimulator:
             )
 
         json_orders = []
+        n_active_orders = 0
+        n_completed_orders = 0
+        average_waiting_time = 0.0
         for order in self._orders.values():
             if order.status == OrderStatus.COMPLETED:
+                if order.pickup_start_time is None:
+                    raise ValueError("Pickup start time is not set for completed order")
+                average_waiting_time += order.pickup_start_time - order.creation_time
+                n_completed_orders += 1
                 continue
+
+            n_active_orders += 1
 
             self._update_bounds(bounds, order.from_location)
             self._update_bounds(bounds, order.to_location)
@@ -469,6 +480,8 @@ class LogisticsSimulator:
                     "status": order.status.value,
                 }
             )
+        if n_completed_orders != 0:
+            average_waiting_time /= n_completed_orders
 
         json_observation = {
             "current_time": self._current_time,
@@ -480,6 +493,28 @@ class LogisticsSimulator:
             "simulation_id": self._simulation_id,
             "start_time": self._config.start_time,
             "end_time": self._config.end_time,
+            "metrics": [
+                {
+                    "name": "Number of workers",
+                    "value": len(self._workers),
+                    "unit": "",
+                },
+                {
+                    "name": "Number of active orders",
+                    "value": n_active_orders,
+                    "unit": "",
+                },
+                {
+                    "name": "Number of completed orders",
+                    "value": n_completed_orders,
+                    "unit": "",
+                },
+                {
+                    "name": "Average waiting time",
+                    "value": average_waiting_time,
+                    "unit": "min",
+                },
+            ],
         }
 
         json_data = {
