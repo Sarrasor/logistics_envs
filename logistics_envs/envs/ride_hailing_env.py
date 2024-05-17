@@ -71,8 +71,8 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
         self._max_orders = max_orders
 
         data_path = pathlib.Path(order_data_path)
-        if not data_path.exists() or not data_path.suffix == ".csv":
-            raise ValueError(f"order_data_path={order_data_path} must be a valid csv file")
+        if not data_path.exists() or data_path.suffix not in (".xls", ".xlsx"):
+            raise ValueError(f"order_data_path={order_data_path} must be a valid xls or xlsx file")
         self._order_data_path = order_data_path
         if order_pickup_time < 1:
             raise ValueError(f"order_pickup_time={order_pickup_time} must be greater than 0")
@@ -94,7 +94,7 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
         self._worker_id_to_index: bidict[str, int] = bidict()
         self._order_id_to_index: bidict[str, int] = bidict()
 
-        orders_data = pd.read_csv(self._order_data_path)
+        orders_data = pd.read_excel(self._order_data_path)
 
         workers_config = []
         for worker_index in range(self._n_drivers):

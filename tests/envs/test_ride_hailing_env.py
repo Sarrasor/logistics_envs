@@ -14,7 +14,7 @@ def env() -> RideHailingEnv:
         "time_step": 1,
         "n_drivers": 3,
         "max_orders": 4,
-        "order_data_path": "test_data/ride_hailing/ride_hailing_example.csv",
+        "order_data_path": "test_data/ride_hailing/ride_hailing_example.xlsx",
         "order_pickup_time": 1,
         "order_drop_off_time": 1,
         "routing_host": "localhost:8002",
@@ -123,6 +123,6 @@ def test_deliver(env: RideHailingEnv) -> None:
 
     assert info["metrics"][0]["value"] == 3.0
     assert info["metrics"][1]["value"] == 19.0
-    assert info["metrics"][2]["value"] == 2.0
+    assert info["metrics"][2]["value"] == 1.0
     assert info["metrics"][3]["value"] == 0.0
-    assert info["metrics"][4]["value"] == 10.0
+    assert info["metrics"][4]["value"] == 16.0

@@ -36,7 +36,7 @@ register(
         "time_step": 1,
         "n_drivers": 10,
         "max_orders": 40,
-        "order_data_path": "test_data/ride_hailing/ride_hailing_example.csv",
+        "order_data_path": "test_data/ride_hailing/ride_hailing_example.xlsx",
         "order_pickup_time": 1,
         "order_drop_off_time": 1,
         "routing_host": "localhost:8002",
