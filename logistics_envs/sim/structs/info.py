@@ -29,6 +29,7 @@ class WorkerInfo:
     id: str
     travel_type: WorkerTravelType
     speed: float
+    color: str
 
 
 @dataclass

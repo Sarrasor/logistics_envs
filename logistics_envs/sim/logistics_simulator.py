@@ -262,6 +262,7 @@ class LogisticsSimulator:
                         id=worker.id,
                         travel_type=worker.travel_type,
                         speed=worker.speed,
+                        color=worker.color,
                     )
                 )
 
