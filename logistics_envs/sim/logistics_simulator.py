@@ -408,7 +408,7 @@ class LogisticsSimulator:
 
         if response.status_code != 200:
             raise RuntimeError(
-                f"Failed to render web frame. Response status code: {response.status_code}"
+                f"Failed to render web frame. Response status code: {response.status_code} Response body: {response.text}"
             )
 
         self._pygame_clock.tick(self._render_fps)
