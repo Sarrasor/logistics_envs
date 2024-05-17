@@ -17,7 +17,7 @@ from logistics_envs.sim.structs.config import (
     RenderMode,
     WebRenderConfig,
 )
-from logistics_envs.sim.structs.info import Info
+from logistics_envs.sim.structs.info import Info, OrderInfo, WorkerInfo
 from logistics_envs.sim.structs.observation import Observation
 from logistics_envs.sim.structs.order import Order, OrderStatus
 from logistics_envs.sim.structs.worker import Worker, WorkerStatus
@@ -185,7 +185,7 @@ class LogisticsSimulator:
                 f"Order {order_id} is already assigned to worker {order.assigned_worker_id}"
             )
 
-        order.assign(worker_id)
+        order.assign(worker_id, self._current_time)
 
     def pickup_order(self, order_id: str, worker_id: str) -> int:
         self._basic_check(order_id, worker_id)
@@ -252,7 +252,99 @@ class LogisticsSimulator:
         return observation
 
     def _get_current_info(self) -> Info:
-        info = Info()
+        workers = []
+        orders = []
+        metrics = []
+        if self._done:
+            for worker in self._workers.values():
+                workers.append(
+                    WorkerInfo(
+                        id=worker.id,
+                        travel_type=worker.travel_type,
+                        speed=worker.speed,
+                    )
+                )
+
+            average_time_to_assign = 0.0
+            average_time_to_pickup = 0.0
+            n_completed_orders = 0
+            for order in self._orders.values():
+                if order.status == OrderStatus.COMPLETED:
+                    if order.pickup_start_time is None:
+                        raise ValueError("Pickup start time is not set for completed order")
+                    average_time_to_pickup += order.pickup_start_time - order.creation_time
+
+                    if order.assignment_time is None:
+                        raise ValueError("Assignment time is not set for completed order")
+                    average_time_to_assign += order.assignment_time - order.creation_time
+                    n_completed_orders += 1
+
+                orders.append(
+                    OrderInfo(
+                        id=order.id,
+                        client_id=order.client_id,
+                        from_location=order.from_location,
+                        to_location=order.to_location,
+                        creation_time=order.creation_time,
+                        time_window=order.time_window,
+                        status=order.status,
+                        assignment_time=order.assignment_time,
+                        pickup_start_time=order.pickup_start_time,
+                        pickup_end_time=order.pickup_end_time,
+                        drop_off_start_time=order.drop_off_start_time,
+                        drop_off_end_time=order.drop_off_end_time,
+                        completion_time=order.completion_time,
+                        assigned_worker_id=order.assigned_worker_id,
+                    )
+                )
+
+            if n_completed_orders != 0:
+                average_time_to_pickup /= n_completed_orders
+                average_time_to_assign /= n_completed_orders
+
+            metrics.append(
+                {
+                    "name": "Number of workers",
+                    "value": len(workers),
+                    "unit": "",
+                }
+            )
+            metrics.append(
+                {
+                    "name": "Total number of orders",
+                    "value": len(orders),
+                    "unit": "",
+                }
+            )
+            metrics.append(
+                {
+                    "name": "Number of completed orders",
+                    "value": n_completed_orders,
+                    "unit": "",
+                }
+            )
+            metrics.append(
+                {
+                    "name": "Average time to assign",
+                    "value": average_time_to_assign,
+                    "unit": "steps",
+                }
+            )
+            metrics.append(
+                {
+                    "name": "Average time to pickup",
+                    "value": average_time_to_pickup,
+                    "unit": "steps",
+                }
+            )
+
+        info = Info(
+            start_time=self._config.start_time,
+            end_time=self._config.end_time,
+            workers=workers,
+            orders=orders,
+            metrics=metrics,
+        )
         return info
 
     def _perform_action(self, action: Action) -> None:
@@ -456,12 +548,18 @@ class LogisticsSimulator:
         json_orders = []
         n_active_orders = 0
         n_completed_orders = 0
-        average_waiting_time = 0.0
+        average_time_to_assign = 0.0
+        average_time_to_pickup = 0.0
         for order in self._orders.values():
             if order.status == OrderStatus.COMPLETED:
                 if order.pickup_start_time is None:
                     raise ValueError("Pickup start time is not set for completed order")
-                average_waiting_time += order.pickup_start_time - order.creation_time
+                average_time_to_pickup += order.pickup_start_time - order.creation_time
+
+                if order.assignment_time is None:
+                    raise ValueError("Assignment time is not set for completed order")
+                average_time_to_assign += order.assignment_time - order.creation_time
+
                 n_completed_orders += 1
                 continue
 
@@ -481,7 +579,8 @@ class LogisticsSimulator:
                 }
             )
         if n_completed_orders != 0:
-            average_waiting_time /= n_completed_orders
+            average_time_to_pickup /= n_completed_orders
+            average_time_to_assign /= n_completed_orders
 
         json_observation = {
             "current_time": self._current_time,
@@ -510,9 +609,14 @@ class LogisticsSimulator:
                     "unit": "",
                 },
                 {
-                    "name": "Average waiting time",
-                    "value": average_waiting_time,
-                    "unit": "min",
+                    "name": "Average time to assign",
+                    "value": average_time_to_assign,
+                    "unit": "steps",
+                },
+                {
+                    "name": "Average time to pickup",
+                    "value": average_time_to_pickup,
+                    "unit": "steps",
                 },
             ],
         }

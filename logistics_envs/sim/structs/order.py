@@ -81,6 +81,7 @@ class Order:
         self._time_window = time_window
 
         self._status = OrderStatus.CREATED
+        self._assignment_time: Optional[int] = None
         self._pickup_start_time: Optional[int] = None
         self._pickup_end_time: Optional[int] = None
         self._drop_off_start_time: Optional[int] = None
@@ -121,15 +122,32 @@ class Order:
         return self._pickup_start_time
 
     @property
+    def pickup_end_time(self) -> Optional[int]:
+        return self._pickup_end_time
+
+    @property
+    def drop_off_start_time(self) -> Optional[int]:
+        return self._drop_off_start_time
+
+    @property
+    def drop_off_end_time(self) -> Optional[int]:
+        return self._drop_off_end_time
+
+    @property
     def completion_time(self) -> Optional[int]:
         return self._completion_time
+
+    @property
+    def assignment_time(self) -> Optional[int]:
+        return self._assignment_time
 
     @property
     def assigned_worker_id(self) -> Optional[str]:
         return self._assigned_worker_id
 
-    def assign(self, worker_id: str) -> None:
+    def assign(self, worker_id: str, assignment_time: int) -> None:
         self._assigned_worker_id = worker_id
+        self._assignment_time = assignment_time
         self._status = OrderStatus.ASSIGNED
 
     def pickup(self, worker_id: str, pickup_start_time: int, pickup_end_time: int) -> None:

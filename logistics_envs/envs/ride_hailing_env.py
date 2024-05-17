@@ -1,10 +1,11 @@
+import dataclasses
 import pathlib
 from typing import Optional
 
 import numpy as np
+import pandas as pd
 from bidict import bidict
 from gymnasium import spaces
-import pandas as pd
 
 from logistics_envs.envs.logistics_sim_wrapper_env import LogisticsSimWrapperEnv
 from logistics_envs.sim.routing_provider import RoutingEngineType
@@ -99,7 +100,7 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
         for worker_index in range(self._n_drivers):
             worker_id = f"driver_{worker_index}"
             self._worker_id_to_index[worker_id] = worker_index
-            random_row = orders_data.sample().iloc[0]
+            random_row = orders_data.sample(random_state=self._seed).iloc[0]
             workers_config.append(
                 {
                     "id": worker_id,
@@ -297,7 +298,8 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
         return observation
 
     def _convert_to_info(self, sim_info: Info) -> dict:
-        return {}
+        info = dataclasses.asdict(sim_info)
+        return info
 
     def render(self) -> Optional[dict]:
         return self._sim.render()

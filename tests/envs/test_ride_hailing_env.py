@@ -71,6 +71,15 @@ def test_idle_action(env: RideHailingEnv) -> None:
     for order_index in range(4):
         assert observation["orders_status"][order_index] == 0
 
+    assert len(info["orders"]) == 19
+    assert len(info["workers"]) == 3
+
+    assert info["metrics"][0]["value"] == 3.0
+    assert info["metrics"][1]["value"] == 19.0
+    assert info["metrics"][2]["value"] == 0.0
+    assert info["metrics"][3]["value"] == 0.0
+    assert info["metrics"][4]["value"] == 0.0
+
 
 def get_fifo_deliver_action(observation: dict) -> dict:
     n_drivers = len(observation["drivers_status"])
@@ -111,3 +120,9 @@ def test_deliver(env: RideHailingEnv) -> None:
     env.close()
 
     assert total_orders != 0
+
+    assert info["metrics"][0]["value"] == 3.0
+    assert info["metrics"][1]["value"] == 19.0
+    assert info["metrics"][2]["value"] == 2.0
+    assert info["metrics"][3]["value"] == 0.0
+    assert info["metrics"][4]["value"] == 10.0

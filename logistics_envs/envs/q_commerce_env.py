@@ -1,3 +1,4 @@
+import dataclasses
 from typing import Optional
 
 import numpy as np
@@ -293,4 +294,5 @@ class QCommerceEnv(LogisticsSimWrapperEnv):
         return observation
 
     def _convert_to_info(self, sim_info: Info) -> dict:
-        return {}
+        info = dataclasses.asdict(sim_info)
+        return info

@@ -162,7 +162,7 @@ def test_noop_action(sim: LogisticsSimulator) -> None:
     assert len(last_obs.orders) == 3
     assert len(last_obs.workers) == 2
 
-    assert last_reward == 3 * -1e6
+    assert last_reward == -75.0
 
 
 def get_move_action(observation: Observation, target_location: Location) -> Action:
