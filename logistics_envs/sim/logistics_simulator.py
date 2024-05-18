@@ -303,17 +303,45 @@ class LogisticsSimulator:
                 average_time_to_pickup /= n_completed_orders
                 average_time_to_assign /= n_completed_orders
 
+            average_idle_rate = 0.0
+            average_with_order_rate = 0.0
             for worker in self._workers.values():
+                status_history = worker.status_history
+                status_history.append((self._current_time, worker.status))
+                worker_total_time = status_history[-1][0] - status_history[0][0]
+                worker_idle_time = 0
+                worker_with_order_time = 0
+                for cur_status, next_status in zip(status_history, status_history[1:]):
+                    if cur_status[1] == WorkerStatus.IDLE:
+                        worker_idle_time += next_status[0] - cur_status[0]
+                    elif cur_status[1] in (
+                        WorkerStatus.PICKING_UP,
+                        WorkerStatus.MOVING_TO_DROP_OFF,
+                        WorkerStatus.DROPPING_OFF,
+                    ):
+                        worker_with_order_time += next_status[0] - cur_status[0]
+                worker_idle_rate = 100.0 * worker_idle_time / worker_total_time
+                worker_with_order_rate = 100.0 * worker_with_order_time / worker_total_time
+
                 workers.append(
                     WorkerInfo(
                         id=worker.id,
                         travel_type=worker.travel_type,
                         speed=worker.speed,
                         color=worker.color,
-                        status_history=worker.status_history,
+                        status_history=status_history,
                         n_completed_orders=worker_to_completed_orders[worker.id],
+                        idle_rate=worker_idle_rate,
+                        with_order_rate=worker_with_order_rate,
                     )
                 )
+
+                average_idle_rate += worker_idle_rate
+                average_with_order_rate += worker_with_order_rate
+
+            if len(self._workers) != 0:
+                average_idle_rate /= len(self._workers)
+                average_with_order_rate /= len(self._workers)
 
             metrics.append(
                 {
@@ -361,6 +389,20 @@ class LogisticsSimulator:
                 {
                     "name": "Completion rate",
                     "value": 100.0 * n_completed_orders / len(orders),
+                    "unit": "%",
+                }
+            )
+            metrics.append(
+                {
+                    "name": "Worker average idle rate",
+                    "value": average_idle_rate,
+                    "unit": "%",
+                }
+            )
+            metrics.append(
+                {
+                    "name": "Worker average with order rate",
+                    "value": average_with_order_rate,
                     "unit": "%",
                 }
             )

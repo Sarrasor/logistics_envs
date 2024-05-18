@@ -32,6 +32,8 @@ class WorkerInfo:
     color: str
     status_history: list[tuple[int, WorkerStatus]]
     n_completed_orders: int
+    idle_rate: float
+    with_order_rate: float
 
 
 @dataclass
