@@ -123,6 +123,7 @@ class LogisticsSimulator:
             self._workers[worker_config.id] = Worker(
                 id=worker_config.id,
                 initial_location=worker_config.initial_location,
+                initial_time=self._current_time,
                 travel_type=worker_config.travel_type,
                 speed=worker_config.speed,
                 color=worker_color,
@@ -256,20 +257,15 @@ class LogisticsSimulator:
         orders = []
         metrics = []
         if self._done:
-            for worker in self._workers.values():
-                workers.append(
-                    WorkerInfo(
-                        id=worker.id,
-                        travel_type=worker.travel_type,
-                        speed=worker.speed,
-                        color=worker.color,
-                    )
-                )
-
+            worker_to_completed_orders = {worker.id: 0 for worker in self._workers.values()}
             average_time_to_assign = 0.0
             average_time_to_pickup = 0.0
             n_completed_orders = 0
+            n_assigned_orders = 0
             for order in self._orders.values():
+                if order.status >= OrderStatus.ASSIGNED:
+                    n_assigned_orders += 1
+
                 if order.status == OrderStatus.COMPLETED:
                     if order.pickup_start_time is None:
                         raise ValueError("Pickup start time is not set for completed order")
@@ -279,6 +275,10 @@ class LogisticsSimulator:
                         raise ValueError("Assignment time is not set for completed order")
                     average_time_to_assign += order.assignment_time - order.creation_time
                     n_completed_orders += 1
+
+                    if order.assigned_worker_id is None:
+                        raise ValueError("Assigned worker is not set for completed order")
+                    worker_to_completed_orders[order.assigned_worker_id] += 1
 
                 orders.append(
                     OrderInfo(
@@ -302,6 +302,18 @@ class LogisticsSimulator:
             if n_completed_orders != 0:
                 average_time_to_pickup /= n_completed_orders
                 average_time_to_assign /= n_completed_orders
+
+            for worker in self._workers.values():
+                workers.append(
+                    WorkerInfo(
+                        id=worker.id,
+                        travel_type=worker.travel_type,
+                        speed=worker.speed,
+                        color=worker.color,
+                        status_history=worker.status_history,
+                        n_completed_orders=worker_to_completed_orders[worker.id],
+                    )
+                )
 
             metrics.append(
                 {
@@ -336,6 +348,20 @@ class LogisticsSimulator:
                     "name": "Average time to pickup",
                     "value": average_time_to_pickup,
                     "unit": "steps",
+                }
+            )
+            metrics.append(
+                {
+                    "name": "Assignment rate",
+                    "value": 100.0 * n_assigned_orders / len(orders),
+                    "unit": "%",
+                }
+            )
+            metrics.append(
+                {
+                    "name": "Completion rate",
+                    "value": 100.0 * n_completed_orders / len(orders),
+                    "unit": "%",
                 }
             )
 

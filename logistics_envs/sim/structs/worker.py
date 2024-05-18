@@ -79,6 +79,7 @@ class Worker:
         self,
         id: str,
         initial_location: Location,
+        initial_time: int,
         travel_type: WorkerTravelType,
         speed: float,
         color: str,
@@ -95,6 +96,7 @@ class Worker:
 
         self._current_action = WorkerAction(type=ActionType.NOOP, parameters=None)
         self._status = WorkerStatus.IDLE
+        self._status_history: list[tuple[int, WorkerStatus]] = [(initial_time, self._status)]
         self._busy_until: Optional[int] = None
         self._path: Optional[dict[int, Location]] = None
         self._picked_up_order_ids: set[str] = set()
@@ -133,6 +135,10 @@ class Worker:
         return self._status
 
     @property
+    def status_history(self) -> list[tuple[int, WorkerStatus]]:
+        return self._status_history.copy()
+
+    @property
     def busy_until(self) -> Optional[int]:
         return self._busy_until
 
@@ -147,6 +153,11 @@ class Worker:
     @property
     def remaining_path_index(self) -> Optional[int]:
         return self._remaining_path_index
+
+    def _set_status(self, status: WorkerStatus, current_time: int) -> None:
+        if self._status != status:
+            self._status = status
+            self._status_history.append((current_time, status))
 
     def update_state(self, current_time: int) -> None:
         match self._status:
@@ -186,7 +197,7 @@ class Worker:
         if current_time >= self._busy_until:
             match self._status:
                 case WorkerStatus.MOVING:
-                    self._set_idle_state()
+                    self._set_idle_state(current_time)
                 case WorkerStatus.MOVING_TO_PICKUP:
                     if self._current_order_id is None:
                         raise ValueError(
@@ -215,7 +226,7 @@ class Worker:
             match self._current_action.type:
                 case ActionType.PICKUP:
                     self._current_order_id = None
-                    self._set_idle_state()
+                    self._set_idle_state(current_time)
                 case ActionType.DELIVER:
                     self._drop_off(self._current_order_id, current_time)
                 case _:
@@ -230,11 +241,11 @@ class Worker:
             raise ValueError("Worker is in drop off state, but busy_until is not set")
 
         if current_time >= self._busy_until:
-            self._set_idle_state()
+            self._set_idle_state(current_time)
 
-    def _set_idle_state(self) -> None:
+    def _set_idle_state(self, current_time: int) -> None:
         self._current_action = WorkerAction(type=ActionType.NOOP, parameters=None)
-        self._status = WorkerStatus.IDLE
+        self._set_status(WorkerStatus.IDLE, current_time)
         self._busy_until = None
         self._path = None
 
@@ -314,7 +325,7 @@ class Worker:
             raise ValueError(f"Invalid moving status {moving_status}")
 
         # TODO(dburakov): Maybe should set status to IDLE if the move is instantaneous
-        self._status = moving_status
+        self._set_status(moving_status, current_time)
 
     def _generate_cartesian_path(
         self, location: Location, current_time: int
@@ -429,7 +440,7 @@ class Worker:
         else:
             self._logger.debug(f"Worker {self._id} is calling sim to pick up order {order_id}")
             self._busy_until = self._sim.pickup_order(order.id, self.id)
-            self._status = WorkerStatus.PICKING_UP
+            self._set_status(WorkerStatus.PICKING_UP, current_time)
 
     def _drop_off(self, order_id: str, current_time: int) -> None:
         self._logger.debug(f"Worker {self._id} is dropping off order {order_id}")
@@ -442,7 +453,7 @@ class Worker:
         else:
             self._logger.debug(f"Worker {self._id} is calling sim to drop off order {order_id}")
             self._busy_until = self._sim.drop_off_order(order.id, self.id)
-            self._status = WorkerStatus.DROPPING_OFF
+            self._set_status(WorkerStatus.DROPPING_OFF, current_time)
 
     def _deliver(self, order_id: str, current_time: int) -> None:
         order: Order = self._sim.get_order(order_id)
