@@ -1,5 +1,6 @@
 import dataclasses
 import pathlib
+from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
@@ -27,6 +28,15 @@ from logistics_envs.sim.structs.info import Info
 from logistics_envs.sim.structs.observation import Observation
 
 
+@dataclass
+class DriverConfig:
+    id: str
+    lat: float
+    lon: float
+    travel_type: str
+    speed: float
+
+
 class RideHailingEnv(LogisticsSimWrapperEnv):
     metadata = {"render_modes": ["human"], "render_fps": 30}
 
@@ -36,7 +46,7 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
         start_time: int,
         end_time: int,
         time_step: int,
-        n_drivers: int,
+        drivers_config: list[DriverConfig],
         max_orders: int,
         order_data_path: str,
         order_pickup_time: int,
@@ -62,9 +72,10 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
             raise ValueError(f"time_step={time_step} must be greater than 0")
         self._time_step = time_step
 
-        if n_drivers < 1:
-            raise ValueError(f"n_drivers={n_drivers} must be greater than 0")
-        self._n_drivers = n_drivers
+        if len(drivers_config) < 1:
+            raise ValueError(f"len(drivers_config)={len(drivers_config)} must be greater than 0")
+        self._drivers_config = drivers_config
+        self._n_drivers = len(drivers_config)
 
         if max_orders < 1:
             raise ValueError(f"max_orders={max_orders} must be greater than 0")
@@ -94,25 +105,22 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
         self._worker_id_to_index: bidict[str, int] = bidict()
         self._order_id_to_index: bidict[str, int] = bidict()
 
-        orders_data = pd.read_excel(self._order_data_path)
-
         workers_config = []
-        for worker_index in range(self._n_drivers):
-            worker_id = f"driver_{worker_index}"
-            self._worker_id_to_index[worker_id] = worker_index
-            random_row = orders_data.sample(random_state=self._seed).iloc[0]
+        for worker_index, driver_config in enumerate(self._drivers_config):
+            self._worker_id_to_index[driver_config.id] = worker_index
             workers_config.append(
                 {
-                    "id": worker_id,
+                    "id": driver_config.id,
                     "initial_location": {
-                        "lat": random_row["from_lat"],
-                        "lon": random_row["from_lon"],
+                        "lat": driver_config.lat,
+                        "lon": driver_config.lon,
                     },
-                    "travel_type": "CAR",
-                    "speed": 1.0,
+                    "travel_type": driver_config.travel_type,
+                    "speed": driver_config.speed,
                 }
             )
 
+        orders_data = pd.read_excel(self._order_data_path)
         orders_config = []
         for i, order in orders_data.iterrows():
             orders_config.append(

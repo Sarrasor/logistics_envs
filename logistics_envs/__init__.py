@@ -1,6 +1,7 @@
 from gymnasium.envs.registration import register
 
 from logistics_envs.sim import LocationMode
+from logistics_envs.envs.ride_hailing_env import DriverConfig
 
 register(
     id="logistics_envs/QCommerce-v0",
@@ -34,7 +35,29 @@ register(
         "start_time": 0,
         "end_time": 1439,
         "time_step": 1,
-        "n_drivers": 10,
+        "drivers_config": [
+            DriverConfig(
+                id="driver_1",
+                lat=40.7736331961289,
+                lon=-73.9815323536077,
+                travel_type="CAR",
+                speed=1.0,
+            ),
+            DriverConfig(
+                id="driver_2",
+                lat=40.7839614023224,
+                lon=-73.9786319150131,
+                travel_type="CAR",
+                speed=1.0,
+            ),
+            DriverConfig(
+                id="driver_3",
+                lat=40.7743758167326,
+                lon=-73.873628438902,
+                travel_type="CAR",
+                speed=1.0,
+            ),
+        ],
         "max_orders": 40,
         "order_data_path": "test_data/ride_hailing/ride_hailing_example.xlsx",
         "order_pickup_time": 1,
