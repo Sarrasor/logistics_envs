@@ -1,7 +1,12 @@
 from gymnasium.envs.registration import register
 
 from logistics_envs.sim import LocationMode
-from logistics_envs.envs.ride_hailing_env_config import RideHailingEnvConfig
+from logistics_envs.envs.ride_hailing_env_config import (
+    DriverConfig,
+    DriverTravelType,
+    RideConfig,
+    RideHailingEnvConfig,
+)
 
 register(
     id="logistics_envs/QCommerce-v0",
@@ -31,13 +36,40 @@ register(
     entry_point="logistics_envs.envs:RideHailingEnv",
     max_episode_steps=None,
     kwargs={
-        "config": RideHailingEnvConfig.from_file(
-            file_path="logistics_envs/envs/data/ride_hailing/example.xlsx",
+        "config": RideHailingEnvConfig(
+            rides=[
+                RideConfig(
+                    id="ride_1",
+                    client_id="client_1",
+                    creation_time=0,
+                    from_lat=0.5,
+                    from_lon=0.5,
+                    to_lat=0.6,
+                    to_lon=0.6,
+                )
+            ],
+            drivers=[
+                DriverConfig(
+                    id="driver_1",
+                    lat=0.5,
+                    lon=0.5,
+                    travel_type=DriverTravelType.CAR,
+                    speed=0.05,
+                    fuel_consumption_rate=0.0,
+                ),
+            ],
+            charging_stations=[],
+            start_time=0,
+            end_time=1439,
+            time_step=1,
+            max_rides=10,
+            ride_pickup_time=2,
+            ride_drop_off_time=1,
             mode=LocationMode.GEOGRAPHIC,
             routing_host="localhost:8002",
             render_mode=None,
             render_host="localhost:8000",
-        ),
+        )
     },
 )
 
