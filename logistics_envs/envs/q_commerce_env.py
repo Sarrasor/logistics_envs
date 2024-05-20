@@ -126,6 +126,7 @@ class QCommerceEnv(LogisticsSimWrapperEnv):
                     "initial_location": self._depot_location.to_dict(),
                     "travel_type": "WALK",
                     "speed": self._courier_speed,
+                    "fuel_consumption_rate": 0.0,
                 }
             )
 
@@ -161,6 +162,7 @@ class QCommerceEnv(LogisticsSimWrapperEnv):
                     "window_size": self._order_window_size,
                 },
             },
+            "service_stations": [],
             "start_time": self._start_time,
             "end_time": self._end_time,
             "step_size": self._time_step,

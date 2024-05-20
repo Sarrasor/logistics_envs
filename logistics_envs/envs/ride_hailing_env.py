@@ -1,20 +1,19 @@
 import dataclasses
-import pathlib
-from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
-import pandas as pd
 from bidict import bidict
 from gymnasium import spaces
 
 from logistics_envs.envs.logistics_sim_wrapper_env import LogisticsSimWrapperEnv
+from logistics_envs.envs.ride_hailing_env_config import RideHailingEnvConfig
 from logistics_envs.sim.routing_provider import RoutingEngineType
 from logistics_envs.sim.structs.action import (
     Action,
     ActionType,
     DeliverActionParameters,
     MoveActionParameters,
+    ServiceActionParameters,
     SpecificWorkerAction,
     WorkerAction,
 )
@@ -23,90 +22,27 @@ from logistics_envs.sim.structs.config import (
     LogisticsSimulatorConfig,
     OrderConfig,
     RoutingProviderConfig,
+    ServiceStationConfig,
 )
 from logistics_envs.sim.structs.info import Info
 from logistics_envs.sim.structs.observation import Observation
 
 
-@dataclass
-class DriverConfig:
-    id: str
-    lat: float
-    lon: float
-    travel_type: str
-    speed: float
-
-
 class RideHailingEnv(LogisticsSimWrapperEnv):
     metadata = {"render_modes": ["human"], "render_fps": 30}
 
-    def __init__(
-        self,
-        mode: LocationMode,
-        start_time: int,
-        end_time: int,
-        time_step: int,
-        drivers_config: list[DriverConfig],
-        max_orders: int,
-        order_data_path: str,
-        order_pickup_time: int,
-        order_drop_off_time: int,
-        routing_host: Optional[str] = None,
-        seed: Optional[int] = None,
-        render_mode: Optional[str] = None,
-        render_host: Optional[str] = None,
-    ) -> None:
-        if mode != LocationMode.GEOGRAPHIC:
-            raise ValueError(
-                f"mode={mode} is not supported. Only GEOGRAPHIC mode is supported currently"
-            )
-        self._mode = mode
-
-        if start_time < 0:
-            raise ValueError(f"start_time={start_time} must be greater than or equal to 0")
-        self._start_time = start_time
-        if end_time <= start_time:
-            raise ValueError(f"end_time={end_time} must be greater than start_time={start_time}")
-        self._end_time = end_time
-        if time_step < 1:
-            raise ValueError(f"time_step={time_step} must be greater than 0")
-        self._time_step = time_step
-
-        if len(drivers_config) < 1:
-            raise ValueError(f"len(drivers_config)={len(drivers_config)} must be greater than 0")
-        self._drivers_config = drivers_config
-        self._n_drivers = len(drivers_config)
-
-        if max_orders < 1:
-            raise ValueError(f"max_orders={max_orders} must be greater than 0")
-        self._max_orders = max_orders
-
-        data_path = pathlib.Path(order_data_path)
-        if not data_path.exists() or data_path.suffix not in (".xls", ".xlsx"):
-            raise ValueError(f"order_data_path={order_data_path} must be a valid xls or xlsx file")
-        self._order_data_path = order_data_path
-        if order_pickup_time < 1:
-            raise ValueError(f"order_pickup_time={order_pickup_time} must be greater than 0")
-        self._order_pickup_time = order_pickup_time
-        if order_drop_off_time < 1:
-            raise ValueError(f"order_drop_off_time={order_drop_off_time} must be greater than 0")
-        self._order_drop_off_time = order_drop_off_time
-
-        self._routing_host = routing_host
-
-        self._seed = seed
-        if render_mode is not None and render_mode not in self.metadata["render_modes"]:
-            raise ValueError(
-                f"Invalid render_mode: {render_mode}. Supported modes: {self.metadata['render_modes']}"
-            )
-        self.render_mode = render_mode
-        self._render_host = render_host
+    def __init__(self, config: RideHailingEnvConfig) -> None:
+        self._config = config
+        self._n_drivers = len(self._config.drivers)
+        self._max_rides = self._config.max_rides
+        self._n_charging_stations = len(self._config.charging_stations)
 
         self._worker_id_to_index: bidict[str, int] = bidict()
         self._order_id_to_index: bidict[str, int] = bidict()
+        self._station_id_to_index: bidict[str, int] = bidict()
 
         workers_config = []
-        for worker_index, driver_config in enumerate(self._drivers_config):
+        for worker_index, driver_config in enumerate(self._config.drivers):
             self._worker_id_to_index[driver_config.id] = worker_index
             workers_config.append(
                 {
@@ -117,48 +53,61 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
                     },
                     "travel_type": driver_config.travel_type,
                     "speed": driver_config.speed,
+                    "fuel_consumption_rate": driver_config.fuel_consumption_rate,
                 }
             )
 
-        orders_data = pd.read_excel(self._order_data_path)
         orders_config = []
-        for i, order in orders_data.iterrows():
+        for ride_config in self._config.rides:
             orders_config.append(
                 OrderConfig(
-                    id=f"order_{i}",
-                    client_id=f"client_{i}",
-                    from_location=Location(lat=order["from_lat"], lon=order["from_lon"]),
-                    to_location=Location(lat=order["to_lat"], lon=order["to_lon"]),
-                    creation_time=order["creation_time"],
-                    time_window=[(order["creation_time"], order["creation_time"])],
+                    id=ride_config.id,
+                    client_id=ride_config.client_id,
+                    from_location=Location(lat=ride_config.from_lat, lon=ride_config.from_lon),
+                    to_location=Location(lat=ride_config.to_lat, lon=ride_config.to_lon),
+                    creation_time=ride_config.creation_time,
+                    time_window=[(ride_config.creation_time, ride_config.creation_time)],
                 ),
             )
 
+        service_stations_config = []
+        for station_index, charging_station_config in enumerate(self._config.charging_stations):
+            self._station_id_to_index[charging_station_config.id] = station_index
+            service_stations_config.append(
+                ServiceStationConfig(
+                    id=charging_station_config.id,
+                    location=Location(
+                        lat=charging_station_config.lat, lon=charging_station_config.lon
+                    ),
+                    service_time=charging_station_config.service_time,
+                )
+            )
+
         if self.render_mode == "human":
-            if self._render_host is None:
+            if self._config.render_host is None:
                 raise ValueError("render_host must be provided when render_mode is human")
             render_config = {
                 "render_mode": "WEB",
                 "config": {
                     "render_fps": self.metadata["render_fps"],
-                    "server_host": self._render_host,
+                    "server_host": self._config.render_host,
                 },
             }
         else:
             render_config = {"render_mode": "NONE", "config": None}
 
-        if self._mode == LocationMode.GEOGRAPHIC:
-            if self._routing_host is None:
+        if self._config.mode == LocationMode.GEOGRAPHIC:
+            if self._config.routing_host is None:
                 raise ValueError("routing_host must be provided when mode is GEOGRAPHIC")
             routing_provider_config = RoutingProviderConfig(
                 engine_type=RoutingEngineType.VALHALLA,
-                host=self._routing_host,
+                host=self._config.routing_host,
             )
         else:
             routing_provider_config = None
 
-        config = {
-            "location_mode": self._mode.value,
+        sim_config = {
+            "location_mode": self._config.mode.value,
             "workers": workers_config,
             "order_generator": {
                 "generator_type": "PredefinedOrderGenerator",
@@ -166,19 +115,20 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
                     "orders": orders_config,
                 },
             },
-            "start_time": self._start_time,
-            "end_time": self._end_time,
-            "step_size": self._time_step,
-            "order_pickup_time": self._order_pickup_time,
-            "order_drop_off_time": self._order_drop_off_time,
+            "service_stations": service_stations_config,
+            "start_time": self._config.start_time,
+            "end_time": self._config.end_time,
+            "step_size": self._config.time_step,
+            "order_pickup_time": self._config.ride_pickup_time,
+            "order_drop_off_time": self._config.ride_drop_off_time,
             "render": render_config,
             "routing_provider": routing_provider_config,
-            "seed": self._seed,
+            "seed": self._config.seed,
         }
-        config = LogisticsSimulatorConfig(**config)
-        super().__init__(config)
+        sim_config = LogisticsSimulatorConfig(**sim_config)
+        super().__init__(sim_config)
 
-        if self._mode == LocationMode.GEOGRAPHIC:
+        if self._config.mode == LocationMode.GEOGRAPHIC:
             # Lat in [-90, 90], lon in [-180, 180]
             location_min = np.array([[-90.0, -180.0]], dtype=np.float32)
             location_max = np.array([[90.0, 180.0]], dtype=np.float32)
@@ -194,33 +144,41 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
                     dtype=np.float32,
                 ),
                 "drivers_status": spaces.MultiDiscrete([6] * self._n_drivers),
-                "n_orders": spaces.Discrete(self._max_orders + 1),
-                "orders_from_location": spaces.Box(
-                    low=np.repeat(location_min, self._max_orders, 0),
-                    high=np.repeat(location_max, self._max_orders, 0),
+                "n_rides": spaces.Discrete(self._max_rides + 1),
+                "rides_from_location": spaces.Box(
+                    low=np.repeat(location_min, self._max_rides, 0),
+                    high=np.repeat(location_max, self._max_rides, 0),
                     dtype=np.float32,
                 ),
-                "orders_to_location": spaces.Box(
-                    low=np.repeat(location_min, self._max_orders, 0),
-                    high=np.repeat(location_max, self._max_orders, 0),
+                "rides_to_location": spaces.Box(
+                    low=np.repeat(location_min, self._max_rides, 0),
+                    high=np.repeat(location_max, self._max_rides, 0),
                     dtype=np.float32,
                 ),
-                "orders_status": spaces.MultiDiscrete([6] * self._max_orders),
-                "orders_creation_time": spaces.Box(
+                "rides_status": spaces.MultiDiscrete([6] * self._max_rides),
+                "rides_creation_time": spaces.Box(
                     low=0,
-                    high=self._end_time,
-                    shape=(self._max_orders, 1),
+                    high=self._config.end_time,
+                    shape=(self._max_rides, 1),
                     dtype=np.int32,
+                ),
+                "charging_stations_location": spaces.Box(
+                    low=np.repeat(location_min, self._n_charging_stations, 0),
+                    high=np.repeat(location_max, self._n_charging_stations, 0),
+                    dtype=np.float32,
                 ),
             }
         )
-        # action: Primary action. One of: {0=NOOP, 1=MOVE, 2=SERVE}
-        # target: Target order index for MOVE and SERVE actions, can be arbitrary for NOOP
-        # Location for MOVE action, can be arbitrary for NOOP and SERVE
+        # action: Primary action. One of: {0=NOOP, 1=MOVE, 2=SERVE, 3=CHARGE}
+        # target: Target ride index for SERVE action, target charging station for CHARGE action,
+        # and can be arbitrary for NOOP and MOVE
+        # Location for MOVE action, can be arbitrary for NOOP, SERVE and CHARGE
         self.action_space = spaces.Dict(
             {
-                "action": spaces.MultiDiscrete([3] * self._n_drivers),
-                "target": spaces.MultiDiscrete([self._max_orders] * self._n_drivers),
+                "action": spaces.MultiDiscrete([4] * self._n_drivers),
+                "target": spaces.MultiDiscrete(
+                    [max(self._max_rides, self._n_charging_stations)] * self._n_drivers
+                ),
                 "location": spaces.Box(
                     low=np.repeat(location_min, self._n_drivers, 0),
                     high=np.repeat(location_max, self._n_drivers, 0),
@@ -251,6 +209,15 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
                             order_id=self._order_id_to_index.inverse[target]
                         ),
                     )
+                case 3:
+                    worker_action = WorkerAction(
+                        type=ActionType.SERVICE,
+                        parameters=ServiceActionParameters(
+                            service_station_id=self._station_id_to_index.inverse[target],
+                            # TODO(dburakov): Implement max service time
+                            max_service_time=0,
+                        ),
+                    )
                 case _:
                     raise ValueError(f"Unknown action: {action}")
 
@@ -267,36 +234,36 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
         observation = {
             "drivers_location": np.zeros((self._n_drivers, 2), dtype=np.float32),
             "drivers_status": np.zeros((self._n_drivers,), dtype=np.int32),
-            "n_orders": 0,
-            "orders_from_location": np.zeros((self._max_orders, 2), dtype=np.float32),
-            "orders_to_location": np.zeros((self._max_orders, 2), dtype=np.float32),
-            "orders_status": np.zeros((self._max_orders,), dtype=np.int32),
-            "orders_creation_time": np.zeros((self._max_orders, 1), dtype=np.int32),
+            "n_rides": 0,
+            "rides_from_location": np.zeros((self._max_rides, 2), dtype=np.float32),
+            "rides_to_location": np.zeros((self._max_rides, 2), dtype=np.float32),
+            "rides_status": np.zeros((self._max_rides,), dtype=np.int32),
+            "rides_creation_time": np.zeros((self._max_rides, 1), dtype=np.int32),
+            "charging_stations_location": np.zeros(
+                (self._n_charging_stations, 2), dtype=np.float32
+            ),
         }
         self._order_id_to_index = bidict()
-        n_orders = 0
+        n_rides = 0
         for order_observation in sim_observation.orders:
             # TODO(dburakov): Maybe will need to filter order observations that do not
             # have CREATED status
 
-            n_orders += 1
-            order_index = len(self._order_id_to_index)
-            self._order_id_to_index[order_observation.id] = order_index
+            n_rides += 1
+            self._order_id_to_index[order_observation.id] = len(self._order_id_to_index)
 
             order_index = self._order_id_to_index[order_observation.id]
-            observation["orders_from_location"][order_index] = (
+            observation["rides_from_location"][order_index] = (
                 order_observation.from_location.to_numpy()
             )
-            observation["orders_to_location"][order_index] = (
-                order_observation.to_location.to_numpy()
-            )
-            observation["orders_status"][order_index] = order_observation.status.to_int()
-            observation["orders_creation_time"][order_index] = order_observation.creation_time
+            observation["rides_to_location"][order_index] = order_observation.to_location.to_numpy()
+            observation["rides_status"][order_index] = order_observation.status.to_int()
+            observation["rides_creation_time"][order_index] = order_observation.creation_time
 
-            if n_orders >= self._max_orders:
-                # Truncate orders if there are more than max_orders
+            if n_rides >= self._max_rides:
+                # Truncate rides if there are more than max_rides
                 break
-        observation["n_orders"] = n_orders
+        observation["n_rides"] = n_rides
 
         for worker_observation in sim_observation.workers:
             worker_index = self._worker_id_to_index[worker_observation.id]

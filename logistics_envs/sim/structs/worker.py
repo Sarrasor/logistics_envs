@@ -29,7 +29,9 @@ class WorkerTravelType(str, Enum):
 
 class WorkerStatus(str, Enum):
     IDLE = "IDLE"
+    IN_SERVICE = "IN_SERVICE"
     MOVING = "MOVING"
+    MOVING_TO_SERVICE = "MOVING_TO_SERVICE"
     MOVING_TO_PICKUP = "MOVING_TO_PICKUP"
     MOVING_TO_DROP_OFF = "MOVING_TO_DROP_OFF"
     PICKING_UP = "PICKING_UP"
@@ -42,16 +44,20 @@ class WorkerStatus(str, Enum):
         match status_str:
             case "IDLE":
                 return 0
-            case "MOVING":
+            case "IN_SERVICE":
                 return 1
-            case "MOVING_TO_PICKUP":
+            case "MOVING":
                 return 2
-            case "MOVING_TO_DROP_OFF":
+            case "MOVING_IN_SERVICE":
                 return 3
-            case "PICKING_UP":
+            case "MOVING_TO_PICKUP":
                 return 4
-            case "DROPPING_OFF":
+            case "MOVING_TO_DROP_OFF":
                 return 5
+            case "PICKING_UP":
+                return 6
+            case "DROPPING_OFF":
+                return 7
             case _:
                 raise ValueError(f"Unknown status string: {status_str}")
 
@@ -59,6 +65,7 @@ class WorkerStatus(str, Enum):
     def is_moving_status(status: "WorkerStatus") -> bool:
         return status in {
             WorkerStatus.MOVING,
+            WorkerStatus.MOVING_TO_SERVICE,
             WorkerStatus.MOVING_TO_PICKUP,
             WorkerStatus.MOVING_TO_DROP_OFF,
         }
@@ -72,6 +79,7 @@ class WorkerObservation:
     speed: float
     status: WorkerStatus
     action: WorkerAction
+    fuel: float
 
 
 class Worker:
@@ -82,6 +90,7 @@ class Worker:
         initial_time: int,
         travel_type: WorkerTravelType,
         speed: float,
+        fuel_consumption_rate: float,
         color: str,
         sim: "LogisticsSimulator",  # noqa: F821 # type: ignore
         logger: Logger,
@@ -101,6 +110,12 @@ class Worker:
         self._path: Optional[dict[int, Location]] = None
         self._picked_up_order_ids: set[str] = set()
         self._current_order_id: Optional[str] = None
+
+        # TODO(dburakov): Create fuel consumption model
+        self._fuel_consumption_rate = fuel_consumption_rate
+        self._fuel: float = 1.0
+        self._service_station_id: Optional[str] = None
+        self._max_service_time: Optional[int] = None
 
         self._route: Optional[Route] = None
         self._remaining_path_indices: Optional[dict[int, int]] = None
@@ -125,6 +140,10 @@ class Worker:
     @property
     def speed(self) -> float:
         return self._speed
+
+    @property
+    def fuel(self) -> float:
+        return self._fuel
 
     @property
     def color(self) -> str:
@@ -160,11 +179,18 @@ class Worker:
             self._status_history.append((current_time, status))
 
     def update_state(self, current_time: int) -> None:
+        if self._fuel <= 0.0:
+            self._logger.debug(f"Worker {self._id} is out of fuel")
+            self._set_idle_state(current_time)
+            # TODO(dburakov): Maybe should force to refuel
+            return
+
         match self._status:
             case WorkerStatus.IDLE:
                 self._update_in_idle_status(current_time)
             case (
                 WorkerStatus.MOVING
+                | WorkerStatus.MOVING_TO_SERVICE
                 | WorkerStatus.MOVING_TO_PICKUP
                 | WorkerStatus.MOVING_TO_DROP_OFF
             ):
@@ -173,6 +199,8 @@ class Worker:
                 self._update_in_picking_up_status(current_time)
             case WorkerStatus.DROPPING_OFF:
                 self._update_in_dropping_off_status(current_time)
+            case WorkerStatus.IN_SERVICE:
+                self._update_in_service_status(current_time)
             case _:
                 raise ValueError(f"Unknown update worker status {self._status}")
 
@@ -198,6 +226,16 @@ class Worker:
             match self._status:
                 case WorkerStatus.MOVING:
                     self._set_idle_state(current_time)
+                case WorkerStatus.MOVING_TO_SERVICE:
+                    if self._service_station_id is None:
+                        raise ValueError(
+                            "Worker is in moving to service state, but service_station_id is not set"
+                        )
+                    if self._max_service_time is None:
+                        raise ValueError(
+                            "Worker is in moving to service state, but max_service_time is not set"
+                        )
+                    self._service(self._service_station_id, self._max_service_time, current_time)
                 case WorkerStatus.MOVING_TO_PICKUP:
                     if self._current_order_id is None:
                         raise ValueError(
@@ -212,6 +250,9 @@ class Worker:
                     self._drop_off(self._current_order_id, current_time)
                 case _:
                     raise ValueError(f"Unsupported moving status {self._status} in moving update")
+        else:
+            # TODO(dburakov): Create fuel consumption model
+            self._fuel = max(0.0, self._fuel - self._fuel_consumption_rate)
 
     def _update_in_picking_up_status(self, current_time: int) -> None:
         self._logger.debug(f"Worker {self._id} is in picking up state update")
@@ -243,6 +284,18 @@ class Worker:
         if current_time >= self._busy_until:
             self._set_idle_state(current_time)
 
+    def _update_in_service_status(self, current_time: int) -> None:
+        self._logger.debug(f"Worker {self._id} is in service state update")
+
+        if self._busy_until is None:
+            raise ValueError("Worker is in service state, but busy_until is not set")
+
+        if current_time >= self._busy_until:
+            self._fuel = 1.0
+            self._service_station_id = None
+            self._max_service_time = None
+            self._set_idle_state(current_time)
+
     def _set_idle_state(self, current_time: int) -> None:
         self._current_action = WorkerAction(type=ActionType.NOOP, parameters=None)
         self._set_status(WorkerStatus.IDLE, current_time)
@@ -262,11 +315,13 @@ class Worker:
             speed=self._speed,
             status=self._status,
             action=self._current_action,
+            fuel=self._fuel,
         )
 
     def perform_action(self, action: WorkerAction, current_time: int) -> None:
         self._logger.debug(f"Worker {self._id} is performing action {action}")
 
+        # print(f"Worker {self._id} is performing action {action}")
         # TODO(dburakov): Currently NOOP action does not interrupt the current action. Check if
         # this is the desired behavior
         if action.type == ActionType.NOOP:
@@ -303,7 +358,7 @@ class Worker:
                     raise ValueError(f"Invalid service action parameters {action.parameters}")
 
                 self._service(
-                    action.parameters.service_location,
+                    action.parameters.service_station_id,
                     action.parameters.max_service_time,
                     current_time,
                 )
@@ -463,7 +518,22 @@ class Worker:
         else:
             self._pickup(order_id, current_time)
 
-    def _service(
-        self, service_location: Location, max_service_time: int, current_time: int
-    ) -> None:
-        raise NotImplementedError("Service action is not implemented")
+    def _service(self, service_station_id: str, max_service_time: int, current_time: int) -> None:
+        self._logger.debug(f"Worker {self._id} is servicing at {service_station_id}")
+        service_station = self._sim.get_service_station(service_station_id)
+        self._service_station_id = service_station_id
+        self._max_service_time = max_service_time
+
+        if not self._location.near(service_station.location):
+            self._logger.debug(
+                f"Worker {self._id} is moving to service station {service_station_id}"
+            )
+            self._move(service_station.location, current_time, WorkerStatus.MOVING_TO_SERVICE)
+        else:
+            self._logger.debug(
+                f"Worker {self._id} is calling sim to service at {service_station_id}"
+            )
+            self._busy_until = self._sim.service(
+                self.id, self._service_station_id, self._max_service_time
+            )
+            self._set_status(WorkerStatus.IN_SERVICE, current_time)

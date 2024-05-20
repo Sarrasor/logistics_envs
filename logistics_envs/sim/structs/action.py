@@ -34,8 +34,7 @@ class DropOffActionParameters:
 
 @dataclass
 class ServiceActionParameters:
-    # TODO(dburakov): maybe should replace location with service_id
-    service_location: Location
+    service_station_id: str
     max_service_time: int
 
 

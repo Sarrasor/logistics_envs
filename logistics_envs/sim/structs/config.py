@@ -19,6 +19,7 @@ class WorkerConfig(BaseModel):
     initial_location: Location
     travel_type: WorkerTravelType
     speed: PositiveFloat
+    fuel_consumption_rate: NonNegativeFloat
 
 
 class OrderConfig(BaseModel):
@@ -28,6 +29,12 @@ class OrderConfig(BaseModel):
     to_location: Location
     creation_time: NonNegativeInt
     time_window: list[tuple[NonNegativeInt, NonNegativeInt]]
+
+
+class ServiceStationConfig(BaseModel):
+    id: str
+    location: Location
+    service_time: PositiveInt
 
 
 class PredefinedOrderGeneratorConfig(BaseModel):
@@ -96,6 +103,7 @@ class LogisticsSimulatorConfig(BaseModel):
     location_mode: LocationMode
     workers: list[WorkerConfig]
     order_generator: OrderGeneratorConfig
+    service_stations: list[ServiceStationConfig]
     start_time: NonNegativeInt
     end_time: NonNegativeInt
     step_size: PositiveInt

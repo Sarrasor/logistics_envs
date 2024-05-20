@@ -37,6 +37,13 @@ class WorkerInfo:
 
 
 @dataclass
+class ServiceStationInfo:
+    id: str
+    location: Location
+    service_events: list[tuple[str, int, int]]
+
+
+@dataclass
 class Metric:
     name: str
     value: float
@@ -49,4 +56,5 @@ class Info:
     end_time: int
     orders: list[OrderInfo]
     workers: list[WorkerInfo]
+    service_stations: list[ServiceStationInfo]
     metrics: list[Metric]

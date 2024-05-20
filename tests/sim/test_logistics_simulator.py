@@ -20,6 +20,7 @@ from logistics_envs.sim.structs.config import (
     PredefinedOrderGeneratorConfig,
     RenderConfig,
     RenderMode,
+    ServiceStationConfig,
     WorkerConfig,
 )
 from logistics_envs.sim.structs.info import Info
@@ -43,12 +44,14 @@ def sim() -> LogisticsSimulator:
             initial_location=Location(lat=0.5, lon=0.5),
             travel_type=WorkerTravelType.WALK,
             speed=0.1,
+            fuel_consumption_rate=0.0,
         ),
         WorkerConfig(
             id="w_2",
             initial_location=Location(lat=0.5, lon=0.5),
             travel_type=WorkerTravelType.WALK,
             speed=0.1,
+            fuel_consumption_rate=0.0,
         ),
     ]
 
@@ -79,6 +82,14 @@ def sim() -> LogisticsSimulator:
         ),
     ]
 
+    service_stations = [
+        ServiceStationConfig(
+            id="station_1",
+            location=Location(lat=0.5, lon=0.5),
+            service_time=1,
+        )
+    ]
+
     order_generator_config = OrderGeneratorConfig(
         generator_type="PredefinedOrderGenerator",
         config=PredefinedOrderGeneratorConfig(orders=orders),
@@ -88,6 +99,7 @@ def sim() -> LogisticsSimulator:
         location_mode=LocationMode.CARTESIAN,
         workers=workers,
         order_generator=order_generator_config,
+        service_stations=service_stations,
         start_time=0,
         end_time=40,
         step_size=1,

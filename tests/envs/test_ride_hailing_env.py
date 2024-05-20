@@ -3,51 +3,22 @@ import gymnasium as gym
 
 from logistics_envs.envs import RideHailingEnv
 from logistics_envs.sim import LocationMode
-from logistics_envs.envs.ride_hailing_env import DriverConfig
+from logistics_envs.envs.ride_hailing_env import RideHailingEnvConfig
 
 
 @pytest.fixture
 def env() -> RideHailingEnv:
-    config = {
-        "mode": LocationMode.GEOGRAPHIC,
-        "start_time": 0,
-        "end_time": 30,
-        "time_step": 1,
-        "drivers_config": [
-            DriverConfig(
-                id="driver_1",
-                lat=40.7736331961289,
-                lon=-73.9815323536077,
-                travel_type="CAR",
-                speed=1.0,
-            ),
-            DriverConfig(
-                id="driver_2",
-                lat=40.7839614023224,
-                lon=-73.9786319150131,
-                travel_type="CAR",
-                speed=1.0,
-            ),
-            DriverConfig(
-                id="driver_3",
-                lat=40.7743758167326,
-                lon=-73.873628438902,
-                travel_type="CAR",
-                speed=1.0,
-            ),
-        ],
-        "max_orders": 4,
-        "order_data_path": "test_data/ride_hailing/ride_hailing_example.xlsx",
-        "order_pickup_time": 1,
-        "order_drop_off_time": 1,
-        "routing_host": "localhost:8002",
-        "seed": 42,
-    }
+    config = RideHailingEnvConfig.from_file(
+        file_path="test_data/ride_hailing/test.xlsx",
+        mode=LocationMode.GEOGRAPHIC,
+        routing_host="localhost:8002",
+        render_mode=None,
+        render_host="localhost:8000",
+    )
 
     env = gym.make(
         "logistics_envs/RideHailing-v0",
-        render_mode=None,
-        **config,
+        config=config,
     )
     return env  # type: ignore
 
@@ -61,9 +32,10 @@ def test_reset(env: RideHailingEnv) -> None:
     assert len(observation["drivers_status"]) == 3
     assert observation["drivers_location"].shape == (3, 2)
 
-    assert len(observation["orders_status"]) == 4
-    assert observation["orders_from_location"].shape == (4, 2)
-    assert observation["orders_to_location"].shape == (4, 2)
+    assert len(observation["rides_status"]) == 4
+    assert observation["rides_from_location"].shape == (4, 2)
+    assert observation["rides_to_location"].shape == (4, 2)
+    assert observation["charging_stations_location"].shape == (2, 2)
 
 
 def get_idle_action(observation: dict) -> dict:
@@ -92,13 +64,13 @@ def test_idle_action(env: RideHailingEnv) -> None:
         assert last_observation["drivers_status"][courier_index] == 0
 
     for order_index in range(4):
-        assert observation["orders_status"][order_index] == 0
+        assert observation["rides_status"][order_index] == 0
 
-    assert len(info["orders"]) == 19
+    assert len(info["orders"]) == 13
     assert len(info["workers"]) == 3
 
     assert info["metrics"][0]["value"] == 3.0
-    assert info["metrics"][1]["value"] == 19.0
+    assert info["metrics"][1]["value"] == 13.0
     assert info["metrics"][2]["value"] == 0.0
     assert info["metrics"][3]["value"] == 0.0
     assert info["metrics"][4]["value"] == 0.0
@@ -112,18 +84,18 @@ def get_fifo_deliver_action(observation: dict) -> dict:
         "location": [0.0, 0.0] * n_drivers,
     }
 
-    assigned_orders = set()
-    n_orders = observation["n_orders"]
+    assigned_rides = set()
+    n_rides = observation["n_rides"]
     for driver_index in range(n_drivers):
         if observation["drivers_status"][driver_index] == 0:
-            for order_index in range(n_orders):
+            for ride_index in range(n_rides):
                 if (
-                    observation["orders_status"][order_index] == 0
-                    and order_index not in assigned_orders
+                    observation["rides_status"][ride_index] == 0
+                    and ride_index not in assigned_rides
                 ):
                     action["action"][driver_index] = 2
-                    action["target"][driver_index] = order_index
-                    assigned_orders.add(order_index)
+                    action["target"][driver_index] = ride_index
+                    assigned_rides.add(ride_index)
                     break
 
     return action
@@ -132,20 +104,20 @@ def get_fifo_deliver_action(observation: dict) -> dict:
 def test_deliver(env: RideHailingEnv) -> None:
     total_orders = 0
     observation, info = env.reset()
-    total_orders += observation["n_orders"]
+    total_orders += observation["n_rides"]
     done = False
 
     while not done:
         action = get_fifo_deliver_action(observation)
         observation, reward, done, truncated, info = env.step(action)
-        total_orders += observation["n_orders"]
+        total_orders += observation["n_rides"]
 
     env.close()
 
     assert total_orders != 0
 
     assert info["metrics"][0]["value"] == 3.0
-    assert info["metrics"][1]["value"] == 19.0
-    assert info["metrics"][2]["value"] == 2.0
+    assert info["metrics"][1]["value"] == 13.0
+    assert info["metrics"][2]["value"] == 1.0
     assert info["metrics"][3]["value"] == 0.0
-    assert info["metrics"][4]["value"] == 7.0
+    assert info["metrics"][4]["value"] == 6.0

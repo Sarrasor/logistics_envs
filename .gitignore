@@ -1,6 +1,6 @@
 data/
-osrm_files/
-valhalla_files/
+osrm_files*/
+valhalla_files*/
 
 .vscode/
 

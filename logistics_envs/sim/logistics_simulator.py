@@ -17,9 +17,10 @@ from logistics_envs.sim.structs.config import (
     RenderMode,
     WebRenderConfig,
 )
-from logistics_envs.sim.structs.info import Info, OrderInfo, WorkerInfo
+from logistics_envs.sim.structs.info import Info, OrderInfo, ServiceStationInfo, WorkerInfo
 from logistics_envs.sim.structs.observation import Observation
 from logistics_envs.sim.structs.order import Order, OrderStatus
+from logistics_envs.sim.structs.service_station import ServiceStation
 from logistics_envs.sim.structs.worker import Worker, WorkerStatus
 from logistics_envs.sim.utils import generate_colors, set_global_seeds
 
@@ -86,6 +87,7 @@ class LogisticsSimulator:
         self._simulation_id: str = ""
         self._workers: dict[str, Worker] = {}
         self._orders: dict[str, Order] = {}
+        self._service_stations: dict[str, ServiceStation] = {}
         self._rewards: dict[int, float] = {}
         self._current_time: int = 0
         self._done: bool = True
@@ -108,10 +110,14 @@ class LogisticsSimulator:
             raise ValueError(f"Order {order_id} does not exist")
         return self._orders[order_id]
 
-    def reset(self) -> tuple[Observation, Info]:
-        logger.debug("Resetting simulator")
+    def get_service_station(self, service_station_id: str) -> ServiceStation:
+        if service_station_id not in self._service_stations:
+            raise ValueError(f"Service station {service_station_id} does not exist")
+        return self._service_stations[service_station_id]
 
-        self._simulation_id = str(uuid.uuid4())
+    def reset(self, simulation_id: Optional[str] = None) -> tuple[Observation, Info]:
+        logger.debug("Resetting simulator")
+        self._simulation_id = simulation_id if simulation_id is not None else str(uuid.uuid4())
         self._current_time = self._config.start_time
         self._done = False
 
@@ -126,6 +132,7 @@ class LogisticsSimulator:
                 initial_time=self._current_time,
                 travel_type=worker_config.travel_type,
                 speed=worker_config.speed,
+                fuel_consumption_rate=worker_config.fuel_consumption_rate,
                 color=worker_color,
                 sim=self,
                 logger=logger,
@@ -135,6 +142,14 @@ class LogisticsSimulator:
         self._orders = {}
         for order in self._order_generator.generate(self._current_time):
             self._orders[order.id] = order
+
+        self._service_stations = {}
+        for service_station_config in self._config.service_stations:
+            self._service_stations[service_station_config.id] = ServiceStation(
+                id=service_station_config.id,
+                location=service_station_config.location,
+                service_time=service_station_config.service_time,
+            )
 
         self._render_frame()
 
@@ -242,6 +257,25 @@ class LogisticsSimulator:
 
         return drop_off_end_time
 
+    def service(self, worker_id: str, service_station_id: str, max_service_time: int) -> int:
+        if worker_id not in self._workers:
+            raise ValueError(f"Worker {worker_id} does not exist")
+
+        if service_station_id not in self._service_stations:
+            raise ValueError(f"Service station {service_station_id} does not exist")
+
+        worker = self._workers[worker_id]
+        service_station = self._service_stations[service_station_id]
+
+        if not worker.location.near(service_station.location):
+            raise ValueError(
+                f"Worker {worker_id} is not at the service station {service_station_id}. Worker location: {worker.location}, service station location: {service_station.location}"
+            )
+
+        service_end_time = service_station.service(worker_id, max_service_time, self._current_time)
+
+        return service_end_time
+
     def _get_current_observation(self) -> Observation:
         workers = [worker.get_observation() for worker in self._workers.values()]
         orders = [
@@ -249,12 +283,21 @@ class LogisticsSimulator:
             for order in self._orders.values()
             if order.status != OrderStatus.COMPLETED
         ]
-        observation = Observation(current_time=self._current_time, workers=workers, orders=orders)
+        service_stations = [
+            service_station.get_observation() for service_station in self._service_stations.values()
+        ]
+        observation = Observation(
+            current_time=self._current_time,
+            workers=workers,
+            orders=orders,
+            service_stations=service_stations,
+        )
         return observation
 
     def _get_current_info(self) -> Info:
         workers = []
         orders = []
+        service_stations = []
         metrics = []
         if self._done:
             worker_to_completed_orders = {worker.id: 0 for worker in self._workers.values()}
@@ -343,6 +386,19 @@ class LogisticsSimulator:
                 average_idle_rate /= len(self._workers)
                 average_with_order_rate /= len(self._workers)
 
+            for service_station in self._service_stations.values():
+                events = []
+                for event in service_station.service_events:
+                    events.append((event.worker_id, event.start_time, event.end_time))
+
+                service_stations.append(
+                    ServiceStationInfo(
+                        id=service_station.id,
+                        location=service_station.location,
+                        service_events=events,
+                    )
+                )
+
             metrics.append(
                 {
                     "name": "Number of workers",
@@ -412,6 +468,7 @@ class LogisticsSimulator:
             end_time=self._config.end_time,
             workers=workers,
             orders=orders,
+            service_stations=service_stations,
             metrics=metrics,
         )
         return info
@@ -547,6 +604,14 @@ class LogisticsSimulator:
                 radius=3,
             )
 
+        for service_station in self._service_stations.values():
+            pygame.draw.circle(
+                surface=surface,
+                color=(255, 0, 0),
+                center=self._location_to_coordinates(service_station.location),
+                radius=5,
+            )
+
         current_time = self._pygame_font.render(
             f"Current time: {self._current_time}", True, (0, 0, 0)
         )
@@ -607,6 +672,7 @@ class LogisticsSimulator:
                     "location": worker.location.to_dict(),
                     "travel_type": worker.travel_type.value,
                     "speed": worker.speed,
+                    "fuel": worker.fuel,
                     "path": encoded_path,
                     "remaining_path_index": remaining_path_index,
                     "status": worker.status.value,
@@ -651,11 +717,22 @@ class LogisticsSimulator:
             average_time_to_pickup /= n_completed_orders
             average_time_to_assign /= n_completed_orders
 
+        json_service_stations = []
+        for service_station in self._service_stations.values():
+            self._update_bounds(bounds, service_station.location)
+            json_service_stations.append(
+                {
+                    "id": service_station.id,
+                    "location": service_station.location.to_dict(),
+                }
+            )
+
         json_observation = {
             "current_time": self._current_time,
             "bounds": bounds,
             "workers": json_workers,
             "orders": json_orders,
+            "service_stations": json_service_stations,
         }
         json_info = {
             "simulation_id": self._simulation_id,
