@@ -36,6 +36,7 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
         self._n_drivers = len(self._config.drivers)
         self._max_rides = self._config.max_rides
         self._n_charging_stations = len(self._config.charging_stations)
+        self.render_mode = self._config.render_mode
 
         self._worker_id_to_index: bidict[str, int] = bidict()
         self._order_id_to_index: bidict[str, int] = bidict()
