@@ -32,7 +32,7 @@ register(
     max_episode_steps=None,
     kwargs={
         "config": RideHailingEnvConfig.from_file(
-            file_path="test_data/ride_hailing/example.xlsx",
+            file_path="logistics_envs/envs/data/ride_hailing/example.xlsx",
             mode=LocationMode.GEOGRAPHIC,
             routing_host="localhost:8002",
             render_mode=None,
