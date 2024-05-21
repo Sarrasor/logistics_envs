@@ -155,6 +155,12 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
 
         self.observation_space = spaces.Dict(
             {
+                "current_time": spaces.Box(
+                    low=0,
+                    high=self._config.end_time,
+                    shape=(1,),
+                    dtype=np.int32,
+                ),
                 "drivers_location": spaces.Box(
                     low=np.repeat(location_min, self._n_drivers, 0),
                     high=np.repeat(location_max, self._n_drivers, 0),
@@ -252,6 +258,7 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
 
     def _convert_to_observation(self, sim_observation: Observation) -> dict:
         observation = {
+            "current_time": np.array([sim_observation.current_time], dtype=np.int32),
             "drivers_location": np.zeros((self._n_drivers, 2), dtype=np.float32),
             "drivers_status": np.zeros((self._n_drivers,), dtype=np.int32),
             "drivers_fuel": np.zeros((self._n_drivers, 1), dtype=np.float32),
