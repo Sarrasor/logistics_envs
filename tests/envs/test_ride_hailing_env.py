@@ -69,11 +69,18 @@ def test_idle_action(env: RideHailingEnv) -> None:
     assert len(info["orders"]) == 5
     assert len(info["workers"]) == 3
 
-    assert info["metrics"][0]["value"] == 3.0
-    assert info["metrics"][1]["value"] == 5.0
-    assert info["metrics"][2]["value"] == 0.0
+    assert info["metrics"][0]["value"] == -212.0
+    assert info["metrics"][1]["value"] == 3.0
+    assert info["metrics"][2]["value"] == 5.0
     assert info["metrics"][3]["value"] == 0.0
-    assert info["metrics"][4]["value"] == 0.0
+    assert info["metrics"][4]["value"] == float("inf")
+    assert info["metrics"][5]["value"] == float("inf")
+    assert info["metrics"][6]["value"] == 0.0
+    assert info["metrics"][7]["value"] == 0.0
+    assert info["metrics"][8]["value"] == 100.0
+    assert info["metrics"][9]["value"] == 0.0
+    assert info["metrics"][10]["value"] == 0.0
+    assert info["metrics"][11]["value"] == 0.0
 
 
 def get_fifo_deliver_action(observation: dict) -> dict:
@@ -116,8 +123,15 @@ def test_deliver(env: RideHailingEnv) -> None:
 
     assert total_orders != 0
 
-    assert info["metrics"][0]["value"] == 3.0
-    assert info["metrics"][1]["value"] == 5.0
+    assert info["metrics"][0]["value"] == -88.0
+    assert info["metrics"][1]["value"] == 3.0
     assert info["metrics"][2]["value"] == 5.0
-    assert info["metrics"][3]["value"] == 2.6
-    assert info["metrics"][4]["value"] == 8.0
+    assert info["metrics"][3]["value"] == 5.0
+    assert info["metrics"][4]["value"] == 2.6
+    assert info["metrics"][5]["value"] == 8.0
+    assert info["metrics"][6]["value"] == 100.0
+    assert info["metrics"][7]["value"] == 100.0
+    assert info["metrics"][8]["value"] == 50.0
+    assert info["metrics"][9]["value"] == 32.0
+    assert info["metrics"][10]["value"] > 0.0
+    assert info["metrics"][11]["value"] == 0.0

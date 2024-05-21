@@ -416,6 +416,13 @@ class LogisticsSimulator:
 
             metrics.append(
                 {
+                    "name": "Total reward",
+                    "value": total_reward,
+                    "unit": "",
+                }
+            )
+            metrics.append(
+                {
                     "name": "Number of workers",
                     "value": len(workers),
                     "unit": "",
@@ -488,13 +495,6 @@ class LogisticsSimulator:
                 {
                     "name": "Worker average service station visits",
                     "value": average_service_station_visits,
-                    "unit": "",
-                }
-            )
-            metrics.append(
-                {
-                    "name": "Total reward",
-                    "value": total_reward,
                     "unit": "",
                 }
             )
