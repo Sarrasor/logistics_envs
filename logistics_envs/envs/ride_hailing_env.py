@@ -85,15 +85,31 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
             )
 
         if self.render_mode == "human":
-            if self._config.render_host is None:
-                raise ValueError("render_host must be provided when render_mode is human")
-            render_config = {
-                "render_mode": "WEB",
-                "config": {
-                    "render_fps": self.metadata["render_fps"],
-                    "server_host": self._config.render_host,
-                },
-            }
+            if self._config.mode == LocationMode.GEOGRAPHIC:
+                if self._config.render_host is None:
+                    raise ValueError("render_host must be provided when render_mode is human")
+                render_config = {
+                    "render_mode": "WEB",
+                    "config": {
+                        "render_fps": self.metadata["render_fps"],
+                        "server_host": self._config.render_host,
+                    },
+                }
+            elif self._config.mode == LocationMode.CARTESIAN:
+                render_config = {
+                    "render_mode": "PYGAME",
+                    "config": {
+                        "render_fps": self.metadata["render_fps"],
+                        "window_size": (1000, 1000),
+                        "hide_completed_orders": True,
+                        "bounding_box": {
+                            "bottom_left": {"lat": 0.0, "lon": 0.0},
+                            "top_right": {"lat": 1.0, "lon": 1.0},
+                        },
+                    },
+                }
+            else:
+                raise ValueError(f"Unknown mode: {self._config.mode}")
         else:
             render_config = {"render_mode": "NONE", "config": None}
 
@@ -144,7 +160,10 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
                     high=np.repeat(location_max, self._n_drivers, 0),
                     dtype=np.float32,
                 ),
-                "drivers_status": spaces.MultiDiscrete([6] * self._n_drivers),
+                "drivers_status": spaces.MultiDiscrete([8] * self._n_drivers),
+                "drivers_fuel": spaces.Box(
+                    low=0.0, high=1.0, shape=(self._n_drivers, 1), dtype=np.float32
+                ),
                 "n_rides": spaces.Discrete(self._max_rides + 1),
                 "rides_from_location": spaces.Box(
                     low=np.repeat(location_min, self._max_rides, 0),
@@ -235,6 +254,7 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
         observation = {
             "drivers_location": np.zeros((self._n_drivers, 2), dtype=np.float32),
             "drivers_status": np.zeros((self._n_drivers,), dtype=np.int32),
+            "drivers_fuel": np.zeros((self._n_drivers, 1), dtype=np.float32),
             "n_rides": 0,
             "rides_from_location": np.zeros((self._max_rides, 2), dtype=np.float32),
             "rides_to_location": np.zeros((self._max_rides, 2), dtype=np.float32),
@@ -270,6 +290,13 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
             worker_index = self._worker_id_to_index[worker_observation.id]
             observation["drivers_location"][worker_index] = worker_observation.location.to_numpy()
             observation["drivers_status"][worker_index] = worker_observation.status.to_int()
+            observation["drivers_fuel"][worker_index] = worker_observation.fuel
+
+        for station_observation in sim_observation.service_stations:
+            station_index = self._station_id_to_index[station_observation.id]
+            observation["charging_stations_location"][station_index] = (
+                station_observation.location.to_numpy()
+            )
 
         return observation
 

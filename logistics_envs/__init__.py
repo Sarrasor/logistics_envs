@@ -46,7 +46,25 @@ register(
                     from_lon=0.5,
                     to_lat=0.6,
                     to_lon=0.6,
-                )
+                ),
+                RideConfig(
+                    id="ride_2",
+                    client_id="client_2",
+                    creation_time=10,
+                    from_lat=0.5,
+                    from_lon=0.1,
+                    to_lat=0.6,
+                    to_lon=0.9,
+                ),
+                RideConfig(
+                    id="ride_3",
+                    client_id="client_3",
+                    creation_time=20,
+                    from_lat=0.0,
+                    from_lon=0.1,
+                    to_lat=0.8,
+                    to_lon=0.8,
+                ),
             ],
             drivers=[
                 DriverConfig(
@@ -60,15 +78,15 @@ register(
             ],
             charging_stations=[],
             start_time=0,
-            end_time=1439,
+            end_time=50,
             time_step=1,
-            max_rides=10,
+            max_rides=4,
             ride_pickup_time=2,
             ride_drop_off_time=1,
-            mode=LocationMode.GEOGRAPHIC,
-            routing_host="localhost:8002",
+            mode=LocationMode.CARTESIAN,
+            routing_host=None,
             render_mode=None,
-            render_host="localhost:8000",
+            render_host=None,
         )
     },
 )

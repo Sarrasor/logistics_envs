@@ -179,7 +179,7 @@ class QCommerceEnv(LogisticsSimWrapperEnv):
                 "couriers_location": spaces.Box(
                     low=0.0, high=1.0, shape=(self._n_couriers, 2), dtype=np.float32
                 ),
-                "couriers_status": spaces.MultiDiscrete([6] * self._n_couriers),
+                "couriers_status": spaces.MultiDiscrete([8] * self._n_couriers),
                 "depot_location": spaces.Box(low=0.0, high=1.0, shape=(2,), dtype=np.float32),
                 "n_orders": spaces.Discrete(self._max_orders + 1),
                 "orders_from_location": spaces.Box(

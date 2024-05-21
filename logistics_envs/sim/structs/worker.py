@@ -48,7 +48,7 @@ class WorkerStatus(str, Enum):
                 return 1
             case "MOVING":
                 return 2
-            case "MOVING_IN_SERVICE":
+            case "MOVING_TO_SERVICE":
                 return 3
             case "MOVING_TO_PICKUP":
                 return 4

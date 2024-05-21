@@ -9,11 +9,11 @@ from logistics_envs.envs.ride_hailing_env import RideHailingEnvConfig
 @pytest.fixture
 def env() -> RideHailingEnv:
     config = RideHailingEnvConfig.from_file(
-        file_path="test_data/ride_hailing/test.xlsx",
-        mode=LocationMode.GEOGRAPHIC,
-        routing_host="localhost:8002",
+        file_path="test_data/ride_hailing/test_cartesian.xlsx",
+        mode=LocationMode.CARTESIAN,
+        routing_host=None,
         render_mode=None,
-        render_host="localhost:8000",
+        render_host=None,
     )
 
     env = gym.make(
@@ -66,11 +66,11 @@ def test_idle_action(env: RideHailingEnv) -> None:
     for order_index in range(4):
         assert observation["rides_status"][order_index] == 0
 
-    assert len(info["orders"]) == 13
+    assert len(info["orders"]) == 5
     assert len(info["workers"]) == 3
 
     assert info["metrics"][0]["value"] == 3.0
-    assert info["metrics"][1]["value"] == 13.0
+    assert info["metrics"][1]["value"] == 5.0
     assert info["metrics"][2]["value"] == 0.0
     assert info["metrics"][3]["value"] == 0.0
     assert info["metrics"][4]["value"] == 0.0
@@ -117,7 +117,7 @@ def test_deliver(env: RideHailingEnv) -> None:
     assert total_orders != 0
 
     assert info["metrics"][0]["value"] == 3.0
-    assert info["metrics"][1]["value"] == 13.0
-    assert info["metrics"][2]["value"] == 1.0
-    assert info["metrics"][3]["value"] == 0.0
-    assert info["metrics"][4]["value"] == 6.0
+    assert info["metrics"][1]["value"] == 5.0
+    assert info["metrics"][2]["value"] == 5.0
+    assert info["metrics"][3]["value"] == 2.6
+    assert info["metrics"][4]["value"] == 8.0
