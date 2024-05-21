@@ -345,6 +345,9 @@ class LogisticsSimulator:
             if n_completed_orders != 0:
                 average_time_to_pickup /= n_completed_orders
                 average_time_to_assign /= n_completed_orders
+            else:
+                average_time_to_pickup = float("inf")
+                average_time_to_assign = float("inf")
 
             average_idle_rate = 0.0
             average_with_order_rate = 0.0
