@@ -563,28 +563,19 @@ class LogisticsSimulator:
         surface = pygame.Surface(self._window_size)
         surface.fill((255, 255, 255))
 
-        for worker in self._workers.values():
+        for service_station in self._service_stations.values():
             pygame.draw.circle(
                 surface=surface,
-                color=worker.color,
-                center=self._location_to_coordinates(worker.location),
-                radius=5,
+                color=(0, 0, 0),
+                center=self._location_to_coordinates(service_station.location),
+                radius=8,
             )
-
-            if WorkerStatus.is_moving_status(worker.status):
-                if worker.busy_until is None:
-                    raise ValueError("Worker is moving, but busy_until is not set")
-
-                if worker.path is None:
-                    raise ValueError("Worker is moving, but path is not set")
-
-                pygame.draw.line(
-                    surface,
-                    worker.color,
-                    self._location_to_coordinates(worker.location),
-                    self._location_to_coordinates(worker.path[worker.busy_until]),
-                    width=2,
-                )
+            pygame.draw.circle(
+                surface=surface,
+                color=(150, 0, 245),
+                center=self._location_to_coordinates(service_station.location),
+                radius=4,
+            )
 
         for order in self._orders.values():
             if self._hide_completed_orders and order.status == OrderStatus.COMPLETED:
@@ -604,13 +595,29 @@ class LogisticsSimulator:
                 radius=3,
             )
 
-        for service_station in self._service_stations.values():
+        for worker in self._workers.values():
             pygame.draw.circle(
                 surface=surface,
-                color=(255, 0, 0),
-                center=self._location_to_coordinates(service_station.location),
+                color=worker.color,
+                center=self._location_to_coordinates(worker.location),
+                width=3,
                 radius=5,
             )
+
+            if WorkerStatus.is_moving_status(worker.status):
+                if worker.busy_until is None:
+                    raise ValueError("Worker is moving, but busy_until is not set")
+
+                if worker.path is None:
+                    raise ValueError("Worker is moving, but path is not set")
+
+                pygame.draw.line(
+                    surface,
+                    worker.color,
+                    self._location_to_coordinates(worker.location),
+                    self._location_to_coordinates(worker.path[worker.busy_until]),
+                    width=2,
+                )
 
         current_time = self._pygame_font.render(
             f"Current time: {self._current_time}", True, (0, 0, 0)
