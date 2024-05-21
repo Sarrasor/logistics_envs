@@ -120,7 +120,7 @@ class LogisticsSimulator:
         self._simulation_id = simulation_id if simulation_id is not None else str(uuid.uuid4())
         self._current_time = self._config.start_time
         self._done = False
-
+        self._rewards = {}
         self._actions = {}
 
         self._workers = {}
