@@ -349,6 +349,23 @@ class LogisticsSimulator:
                 average_time_to_pickup = float("inf")
                 average_time_to_assign = float("inf")
 
+            worker_to_station_visits = {worker.id: 0 for worker in self._workers.values()}
+            for service_station in self._service_stations.values():
+                events = []
+                for event in service_station.service_events:
+                    worker_to_station_visits[event.worker_id] += 1
+                    events.append((event.worker_id, event.start_time, event.end_time))
+
+                service_stations.append(
+                    ServiceStationInfo(
+                        id=service_station.id,
+                        location=service_station.location,
+                        service_events=events,
+                    )
+                )
+
+            average_traveled_distance = 0.0
+            average_service_station_visits = 0.0
             average_idle_rate = 0.0
             average_with_order_rate = 0.0
             for worker in self._workers.values():
@@ -379,28 +396,21 @@ class LogisticsSimulator:
                         n_completed_orders=worker_to_completed_orders[worker.id],
                         idle_rate=worker_idle_rate,
                         with_order_rate=worker_with_order_rate,
+                        traveled_distance=worker.traveled_distance,
+                        n_service_station_visits=worker_to_station_visits[worker.id],
                     )
                 )
 
+                average_service_station_visits += worker_to_station_visits[worker.id]
+                average_traveled_distance += worker.traveled_distance
                 average_idle_rate += worker_idle_rate
                 average_with_order_rate += worker_with_order_rate
 
             if len(self._workers) != 0:
+                average_traveled_distance /= len(self._workers)
+                average_service_station_visits /= len(self._workers)
                 average_idle_rate /= len(self._workers)
                 average_with_order_rate /= len(self._workers)
-
-            for service_station in self._service_stations.values():
-                events = []
-                for event in service_station.service_events:
-                    events.append((event.worker_id, event.start_time, event.end_time))
-
-                service_stations.append(
-                    ServiceStationInfo(
-                        id=service_station.id,
-                        location=service_station.location,
-                        service_events=events,
-                    )
-                )
 
             total_reward = sum(self._rewards.values())
 
@@ -429,14 +439,14 @@ class LogisticsSimulator:
                 {
                     "name": "Average time to assign",
                     "value": average_time_to_assign,
-                    "unit": "steps",
+                    "unit": "steps" if self._location_mode == LocationMode.CARTESIAN else "min",
                 }
             )
             metrics.append(
                 {
                     "name": "Average time to pickup",
                     "value": average_time_to_pickup,
-                    "unit": "steps",
+                    "unit": "steps" if self._location_mode == LocationMode.CARTESIAN else "min",
                 }
             )
             metrics.append(
@@ -465,6 +475,20 @@ class LogisticsSimulator:
                     "name": "Worker average with order rate",
                     "value": average_with_order_rate,
                     "unit": "%",
+                }
+            )
+            metrics.append(
+                {
+                    "name": "Worker average traveled distance",
+                    "value": average_traveled_distance,
+                    "unit": "" if self._location_mode == LocationMode.CARTESIAN else "m",
+                }
+            )
+            metrics.append(
+                {
+                    "name": "Worker average service station visits",
+                    "value": average_service_station_visits,
+                    "unit": "",
                 }
             )
             metrics.append(
@@ -776,12 +800,12 @@ class LogisticsSimulator:
                 {
                     "name": "Average time to assign",
                     "value": average_time_to_assign,
-                    "unit": "steps",
+                    "unit": "steps" if self._location_mode == LocationMode.CARTESIAN else "min",
                 },
                 {
                     "name": "Average time to pickup",
                     "value": average_time_to_pickup,
-                    "unit": "steps",
+                    "unit": "steps" if self._location_mode == LocationMode.CARTESIAN else "min",
                 },
             ],
         }

@@ -34,6 +34,8 @@ class WorkerInfo:
     n_completed_orders: int
     idle_rate: float
     with_order_rate: float
+    traveled_distance: float
+    n_service_station_visits: int
 
 
 @dataclass

@@ -117,6 +117,8 @@ class Worker:
         self._service_station_id: Optional[str] = None
         self._max_service_time: Optional[int] = None
 
+        self._traveled_distance: float = 0.0
+        self._current_distance: Optional[float] = None
         self._route: Optional[Route] = None
         self._remaining_path_indices: Optional[dict[int, int]] = None
         self._remaining_path_index: Optional[int] = None
@@ -173,6 +175,10 @@ class Worker:
     def remaining_path_index(self) -> Optional[int]:
         return self._remaining_path_index
 
+    @property
+    def traveled_distance(self) -> float:
+        return self._traveled_distance
+
     def _set_status(self, status: WorkerStatus, current_time: int) -> None:
         if self._status != status:
             self._status = status
@@ -223,6 +229,12 @@ class Worker:
             self._remaining_path_index = self._remaining_path_indices[current_time]
 
         if current_time >= self._busy_until:
+            # TODO(dburakov): Maybe should check if the worker reached the destination
+            if self._current_distance is None:
+                raise ValueError("Worker is in moving state, but current_distance is not set")
+            self._traveled_distance += self._current_distance
+            self._current_distance = None
+
             match self._status:
                 case WorkerStatus.MOVING:
                     self._set_idle_state(current_time)
@@ -301,6 +313,7 @@ class Worker:
         self._set_status(WorkerStatus.IDLE, current_time)
         self._busy_until = None
         self._path = None
+        self._current_distance = None
 
         if self._sim.location_mode == LocationMode.GEOGRAPHIC:
             self._route = None
@@ -367,14 +380,15 @@ class Worker:
 
     def _move(self, location: Location, current_time: int, moving_status: WorkerStatus) -> None:
         if self._sim.location_mode == LocationMode.CARTESIAN:
-            path, busy_until = self._generate_cartesian_path(location, current_time)
+            path, busy_until, distance = self._generate_cartesian_path(location, current_time)
         elif self._sim.location_mode == LocationMode.GEOGRAPHIC:
-            path, busy_until = self._generate_geographic_path(location, current_time)
+            path, busy_until, distance = self._generate_geographic_path(location, current_time)
         else:
             raise ValueError(f"Unknown location mode {self._sim.location_mode}")
 
         self._path = path
         self._busy_until = busy_until
+        self._current_distance = distance
 
         if not WorkerStatus.is_moving_status(moving_status):
             raise ValueError(f"Invalid moving status {moving_status}")
@@ -384,7 +398,7 @@ class Worker:
 
     def _generate_cartesian_path(
         self, location: Location, current_time: int
-    ) -> tuple[dict[int, Location], int]:
+    ) -> tuple[dict[int, Location], int, float]:
         # TODO(dburakov): check if the move instruction is out of bounds
 
         from_location = self._location.to_numpy()
@@ -411,11 +425,11 @@ class Worker:
         if distance == 0.0:
             path[times[-1] + dt] = path[times[-1]]
 
-        return path, finish_time
+        return path, finish_time, float(distance)
 
     def _generate_geographic_path(
         self, location: Location, current_time: int
-    ) -> tuple[dict[int, Location], int]:
+    ) -> tuple[dict[int, Location], int, float]:
         if self._sim.routing_provider is None:
             raise ValueError("Routing provider is not set")
         route = self._sim.routing_provider.get_route(self._location, location, self._travel_type)
@@ -480,7 +494,7 @@ class Worker:
         self._remaining_path_indices = remaining_path_indices
         self._remaining_path_index = remaining_path_indices[current_time]
 
-        return path, finish_time
+        return path, finish_time, route.length_meters
 
     def _pickup(self, order_id: str, current_time: int) -> None:
         self._logger.debug(f"Worker {self._id} is picking up order {order_id}")
