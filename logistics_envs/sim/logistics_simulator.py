@@ -399,6 +399,8 @@ class LogisticsSimulator:
                     )
                 )
 
+            total_reward = sum(self._rewards.values())
+
             metrics.append(
                 {
                     "name": "Number of workers",
@@ -460,6 +462,13 @@ class LogisticsSimulator:
                     "name": "Worker average with order rate",
                     "value": average_with_order_rate,
                     "unit": "%",
+                }
+            )
+            metrics.append(
+                {
+                    "name": "Total reward",
+                    "value": total_reward,
+                    "unit": "",
                 }
             )
 
