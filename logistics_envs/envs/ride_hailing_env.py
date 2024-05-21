@@ -167,6 +167,9 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
                     dtype=np.float32,
                 ),
                 "drivers_status": spaces.MultiDiscrete([8] * self._n_drivers),
+                "drivers_speed": spaces.Box(
+                    low=0.0, high=1.0, shape=(self._n_drivers, 1), dtype=np.float32
+                ),
                 "drivers_fuel": spaces.Box(
                     low=0.0, high=1.0, shape=(self._n_drivers, 1), dtype=np.float32
                 ),
@@ -261,6 +264,7 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
             "current_time": np.array([sim_observation.current_time], dtype=np.int32),
             "drivers_location": np.zeros((self._n_drivers, 2), dtype=np.float32),
             "drivers_status": np.zeros((self._n_drivers,), dtype=np.int32),
+            "drivers_speed": np.zeros((self._n_drivers, 1), dtype=np.float32),
             "drivers_fuel": np.zeros((self._n_drivers, 1), dtype=np.float32),
             "n_rides": 0,
             "rides_from_location": np.zeros((self._max_rides, 2), dtype=np.float32),
@@ -297,6 +301,7 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
             worker_index = self._worker_id_to_index[worker_observation.id]
             observation["drivers_location"][worker_index] = worker_observation.location.to_numpy()
             observation["drivers_status"][worker_index] = worker_observation.status.to_int()
+            observation["drivers_speed"][worker_index] = worker_observation.speed
             observation["drivers_fuel"][worker_index] = worker_observation.fuel
 
         for station_observation in sim_observation.service_stations:
