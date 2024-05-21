@@ -1,12 +1,10 @@
 from dataclasses import dataclass
 from enum import Enum
-from functools import total_ordering
 from typing import Optional
 
 from logistics_envs.sim.structs.common import Location
 
 
-@total_ordering
 class OrderStatus(str, Enum):
     CREATED = "CREATED"
     ASSIGNED = "ASSIGNED"
@@ -41,6 +39,21 @@ class OrderStatus(str, Enum):
     def __lt__(self, other):
         if self.__class__ is other.__class__:
             return self._get_int_from_string(self.value) < self._get_int_from_string(other.value)
+        return NotImplemented
+
+    def __le__(self, other):
+        if self.__class__ is other.__class__:
+            return self._get_int_from_string(self.value) <= self._get_int_from_string(other.value)
+        return NotImplemented
+
+    def __gt__(self, other):
+        if self.__class__ is other.__class__:
+            return self._get_int_from_string(self.value) > self._get_int_from_string(other.value)
+        return NotImplemented
+
+    def __ge__(self, other):
+        if self.__class__ is other.__class__:
+            return self._get_int_from_string(self.value) >= self._get_int_from_string(other.value)
         return NotImplemented
 
     def __hash__(self):
