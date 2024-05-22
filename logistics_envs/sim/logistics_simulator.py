@@ -731,6 +731,7 @@ class LogisticsSimulator:
         json_orders = []
         n_active_orders = 0
         n_completed_orders = 0
+        n_canceled_orders = 0
         average_time_to_assign = 0.0
         average_time_to_pickup = 0.0
         for order in self._orders.values():
@@ -744,6 +745,9 @@ class LogisticsSimulator:
                 average_time_to_assign += order.assignment_time - order.creation_time
 
                 n_completed_orders += 1
+                continue
+            elif order.status == OrderStatus.CANCELED:
+                n_canceled_orders += 1
                 continue
 
             n_active_orders += 1
@@ -800,6 +804,11 @@ class LogisticsSimulator:
                 {
                     "name": "Number of completed orders",
                     "value": n_completed_orders,
+                    "unit": "",
+                },
+                {
+                    "name": "Number of canceled orders",
+                    "value": n_canceled_orders,
                     "unit": "",
                 },
                 {
