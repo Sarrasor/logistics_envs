@@ -111,5 +111,6 @@ class LogisticsSimulatorConfig(BaseModel):
     order_pickup_time: NonNegativeInt
     order_drop_off_time: NonNegativeInt
     render: RenderConfig
+    order_cancellation_threshold: Optional[NonNegativeInt] = None
     routing_provider: Optional[RoutingProviderConfig] = None
     seed: Optional[int] = None

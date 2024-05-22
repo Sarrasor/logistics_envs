@@ -188,7 +188,7 @@ class QCommerceEnv(LogisticsSimWrapperEnv):
                 "orders_to_location": spaces.Box(
                     low=0.0, high=1.0, shape=(self._max_orders, 2), dtype=np.float32
                 ),
-                "orders_status": spaces.MultiDiscrete([6] * self._max_orders),
+                "orders_status": spaces.MultiDiscrete([7] * self._max_orders),
                 "orders_creation_time": spaces.Box(
                     low=0,
                     high=self._end_time,

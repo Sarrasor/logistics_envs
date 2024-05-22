@@ -141,6 +141,7 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
             "render": render_config,
             "routing_provider": routing_provider_config,
             "seed": self._config.seed,
+            "order_cancellation_threshold": self._config.order_cancellation_threshold,
         }
         sim_config = LogisticsSimulatorConfig(**sim_config)
         super().__init__(sim_config)
@@ -184,7 +185,7 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
                     high=np.repeat(location_max, self._max_rides, 0),
                     dtype=np.float32,
                 ),
-                "rides_status": spaces.MultiDiscrete([6] * self._max_rides),
+                "rides_status": spaces.MultiDiscrete([7] * self._max_rides),
                 "rides_creation_time": spaces.Box(
                     low=0,
                     high=self._config.end_time,

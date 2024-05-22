@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import Optional
 
+import numpy as np
 import pandas as pd
 from pydantic import BaseModel, NonNegativeInt, PositiveInt, field_validator
 
@@ -52,6 +53,7 @@ class RideHailingEnvConfig(BaseModel):
     mode: LocationMode
     routing_host: Optional[str] = None
     seed: Optional[int] = None
+    order_cancellation_threshold: Optional[NonNegativeInt] = None
     render_mode: Optional[str] = None
     render_host: Optional[str] = None
 
@@ -119,6 +121,7 @@ class RideHailingEnvConfig(BaseModel):
             )
 
         config_data = pd.read_excel(file_path, sheet_name="config")
+        config_data = config_data.replace({np.nan: None})
         config_data = config_data.iloc[0]
 
         return RideHailingEnvConfig(
@@ -132,6 +135,7 @@ class RideHailingEnvConfig(BaseModel):
             ride_pickup_time=config_data["ride_pickup_time"],
             ride_drop_off_time=config_data["ride_drop_off_time"],
             seed=config_data["seed"],
+            order_cancellation_threshold=config_data["order_cancellation_threshold"],
             mode=mode,
             routing_host=routing_host,
             render_mode=render_mode,

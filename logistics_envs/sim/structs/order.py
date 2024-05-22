@@ -12,6 +12,7 @@ class OrderStatus(str, Enum):
     IN_DELIVERY = "IN_DELIVERY"
     IN_DROP_OFF = "IN_DROP_OFF"
     COMPLETED = "COMPLETED"
+    CANCELED = "CANCELED"
 
     def to_int(self) -> int:
         return self._get_int_from_string(self.value)
@@ -30,6 +31,8 @@ class OrderStatus(str, Enum):
                 return 4
             case "COMPLETED":
                 return 5
+            case "CANCELED":
+                return 6
             case _:
                 raise ValueError(f"Unknown status string: {status_str}")
 
@@ -93,6 +96,7 @@ class Order:
         self._creation_time = creation_time
         self._time_window = time_window
 
+        self._cancellation_threshold: Optional[int] = None
         self._status = OrderStatus.CREATED
         self._assignment_time: Optional[int] = None
         self._pickup_start_time: Optional[int] = None
@@ -158,6 +162,9 @@ class Order:
     def assigned_worker_id(self) -> Optional[str]:
         return self._assigned_worker_id
 
+    def set_cancellation_threshold(self, cancellation_threshold: int) -> None:
+        self._cancellation_threshold = cancellation_threshold
+
     def assign(self, worker_id: str, assignment_time: int) -> None:
         self._assigned_worker_id = worker_id
         self._assignment_time = assignment_time
@@ -175,7 +182,12 @@ class Order:
         self._status = OrderStatus.IN_DROP_OFF
 
     def update_state(self, current_time: int) -> None:
-        if (
+        # TODO(dburakov): Implement proper cancellation model
+        if self._cancellation_threshold is not None and self._status == OrderStatus.CREATED:
+            if current_time >= self._creation_time + self._cancellation_threshold:
+                self._status = OrderStatus.CANCELED
+                self._completion_time = current_time
+        elif (
             self._status == OrderStatus.IN_PICKUP
             and self._pickup_end_time is not None
             and current_time >= self._pickup_end_time

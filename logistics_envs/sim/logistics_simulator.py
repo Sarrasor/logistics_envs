@@ -140,8 +140,7 @@ class LogisticsSimulator:
 
         # TODO(dburakov): Probably, need to generate all orders in advance
         self._orders = {}
-        for order in self._order_generator.generate(self._current_time):
-            self._orders[order.id] = order
+        self._generate_orders(self._current_time)
 
         self._service_stations = {}
         for service_station_config in self._config.service_stations:
@@ -154,6 +153,13 @@ class LogisticsSimulator:
         self._render_frame()
 
         return self._get_current_observation(), self._get_current_info()
+
+    def _generate_orders(self, current_time: int) -> None:
+        for order in self._order_generator.generate(current_time):
+            self._orders[order.id] = order
+            self._orders[order.id].set_cancellation_threshold(
+                self._config.order_cancellation_threshold  # type: ignore
+            )
 
     def step(self, action: Action) -> tuple[Observation, float, bool, bool, Info]:
         logging.debug(f"Taking step with action: {action}")
@@ -545,8 +551,7 @@ class LogisticsSimulator:
             worker.update_state(self._current_time)
 
         # TODO(dburakov): Probably, need to generate all orders in advance
-        for order in self._order_generator.generate(self._current_time):
-            self._orders[order.id] = order
+        self._generate_orders(self._current_time)
 
     def _calculate_current_reward(self) -> float:
         # TODO(dburakov): Think about proper reward function
