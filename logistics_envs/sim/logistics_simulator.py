@@ -80,10 +80,7 @@ class LogisticsSimulator:
 
         set_global_seeds(self._config.seed)
 
-        self._order_generator = getattr(
-            order_generators, self._config.order_generator.generator_type
-        )(self._config.order_generator.config)
-
+        self._order_generator: Optional[order_generators.OrderGenerator] = None
         self._simulation_id: str = ""
         self._workers: dict[str, Worker] = {}
         self._orders: dict[str, Order] = {}
@@ -138,6 +135,9 @@ class LogisticsSimulator:
                 logger=logger,
             )
 
+        self._order_generator = getattr(
+            order_generators, self._config.order_generator.generator_type
+        )(self._config.order_generator.config)
         # TODO(dburakov): Probably, need to generate all orders in advance
         self._orders = {}
         self._generate_orders(self._current_time)
@@ -155,6 +155,9 @@ class LogisticsSimulator:
         return self._get_current_observation(), self._get_current_info()
 
     def _generate_orders(self, current_time: int) -> None:
+        if self._order_generator is None:
+            raise ValueError("Order generator is not set")
+
         for order in self._order_generator.generate(current_time):
             self._orders[order.id] = order
             self._orders[order.id].set_cancellation_threshold(
