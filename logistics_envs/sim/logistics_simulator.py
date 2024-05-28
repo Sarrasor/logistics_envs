@@ -316,7 +316,7 @@ class LogisticsSimulator:
             n_completed_orders = 0
             n_assigned_orders = 0
             for order in self._orders.values():
-                if order.status >= OrderStatus.ASSIGNED:
+                if order.status != OrderStatus.CANCELED and order.status >= OrderStatus.ASSIGNED:
                     n_assigned_orders += 1
 
                 if order.status == OrderStatus.COMPLETED:
