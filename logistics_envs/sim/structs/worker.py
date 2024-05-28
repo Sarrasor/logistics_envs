@@ -112,8 +112,9 @@ class Worker:
         self._current_order_id: Optional[str] = None
 
         # TODO(dburakov): Create fuel consumption model
-        self._fuel_consumption_rate = fuel_consumption_rate
+        self._fuel_consumption_rate: float = fuel_consumption_rate
         self._fuel: float = 1.0
+        self._consumed_fuel: float = 0.0
         self._service_station_id: Optional[str] = None
         self._max_service_time: Optional[int] = None
 
@@ -146,6 +147,10 @@ class Worker:
     @property
     def fuel(self) -> float:
         return self._fuel
+
+    @property
+    def consumed_fuel(self) -> float:
+        return self._consumed_fuel
 
     @property
     def color(self) -> str:
@@ -264,7 +269,9 @@ class Worker:
                     raise ValueError(f"Unsupported moving status {self._status} in moving update")
         else:
             # TODO(dburakov): Create fuel consumption model
+            old_fuel = self._fuel
             self._fuel = max(0.0, self._fuel - self._fuel_consumption_rate)
+            self._consumed_fuel += old_fuel - self._fuel
 
     def _update_in_picking_up_status(self, current_time: int) -> None:
         self._logger.debug(f"Worker {self._id} is in picking up state update")
@@ -494,7 +501,7 @@ class Worker:
         self._remaining_path_indices = remaining_path_indices
         self._remaining_path_index = remaining_path_indices[current_time]
 
-        return path, finish_time, route.length_meters
+        return path, finish_time, route.length_meters / 1000.0
 
     def _pickup(self, order_id: str, current_time: int) -> None:
         self._logger.debug(f"Worker {self._id} is picking up order {order_id}")

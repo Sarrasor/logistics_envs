@@ -311,6 +311,7 @@ class LogisticsSimulator:
         metrics = []
         if self._done:
             worker_to_completed_orders = {worker.id: 0 for worker in self._workers.values()}
+            worker_to_assigned_orders = {worker.id: 0 for worker in self._workers.values()}
             average_time_to_assign = 0.0
             average_time_to_pickup = 0.0
             n_completed_orders = 0
@@ -332,6 +333,9 @@ class LogisticsSimulator:
                     if order.assigned_worker_id is None:
                         raise ValueError("Assigned worker is not set for completed order")
                     worker_to_completed_orders[order.assigned_worker_id] += 1
+
+                if order.assigned_worker_id is not None:
+                    worker_to_assigned_orders[order.assigned_worker_id] += 1
 
                 orders.append(
                     OrderInfo(
@@ -396,6 +400,14 @@ class LogisticsSimulator:
                 worker_idle_rate = 100.0 * worker_idle_time / worker_total_time
                 worker_with_order_rate = 100.0 * worker_with_order_time / worker_total_time
 
+                worker_completion_rate = 0.0
+                if worker_to_assigned_orders[worker.id] > 0:
+                    worker_completion_rate = (
+                        100.0
+                        * worker_to_completed_orders[worker.id]
+                        / worker_to_assigned_orders[worker.id]
+                    )
+
                 workers.append(
                     WorkerInfo(
                         id=worker.id,
@@ -403,10 +415,13 @@ class LogisticsSimulator:
                         speed=worker.speed,
                         color=worker.color,
                         status_history=status_history,
+                        n_assigned_orders=worker_to_assigned_orders[worker.id],
                         n_completed_orders=worker_to_completed_orders[worker.id],
+                        completion_rate=worker_completion_rate,
                         idle_rate=worker_idle_rate,
                         with_order_rate=worker_with_order_rate,
                         traveled_distance=worker.traveled_distance,
+                        consumed_fuel=worker.consumed_fuel,
                         n_service_station_visits=worker_to_station_visits[worker.id],
                     )
                 )
@@ -498,7 +513,7 @@ class LogisticsSimulator:
                 {
                     "name": "Worker average traveled distance",
                     "value": average_traveled_distance,
-                    "unit": "" if self._location_mode == LocationMode.CARTESIAN else "m",
+                    "unit": "" if self._location_mode == LocationMode.CARTESIAN else "km",
                 }
             )
             metrics.append(
