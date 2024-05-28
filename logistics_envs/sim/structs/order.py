@@ -14,6 +14,9 @@ class OrderStatus(str, Enum):
     COMPLETED = "COMPLETED"
     CANCELED = "CANCELED"
 
+    def is_terminal(self) -> bool:
+        return self in {OrderStatus.COMPLETED, OrderStatus.CANCELED}
+
     def to_int(self) -> int:
         return self._get_int_from_string(self.value)
 

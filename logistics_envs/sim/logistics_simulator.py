@@ -176,7 +176,8 @@ class LogisticsSimulator:
         truncated = False
         if self._done:
             has_uncompleted_orders = any(
-                order.status != OrderStatus.COMPLETED for order in self._orders.values()
+                order.status in {OrderStatus.COMPLETED, OrderStatus.CANCELED}
+                for order in self._orders.values()
             )
             truncated = has_uncompleted_orders
 
@@ -290,7 +291,7 @@ class LogisticsSimulator:
         orders = [
             order.get_observation()
             for order in self._orders.values()
-            if order.status != OrderStatus.COMPLETED
+            if not order.status.is_terminal()
         ]
         service_stations = [
             service_station.get_observation() for service_station in self._service_stations.values()
@@ -546,7 +547,7 @@ class LogisticsSimulator:
             return
 
         for order in self._orders.values():
-            if order.status == OrderStatus.COMPLETED:
+            if order.status.is_terminal():
                 continue
             order.update_state(self._current_time)
 
@@ -622,7 +623,7 @@ class LogisticsSimulator:
             )
 
         for order in self._orders.values():
-            if self._hide_completed_orders and order.status == OrderStatus.COMPLETED:
+            if self._hide_completed_orders and order.status.is_terminal():
                 continue
 
             if order.status < OrderStatus.IN_DELIVERY:
