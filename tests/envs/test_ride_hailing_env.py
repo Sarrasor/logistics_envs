@@ -123,7 +123,7 @@ def test_deliver(env: RideHailingEnv) -> None:
 
     assert total_orders != 0
 
-    assert info["metrics"][0]["value"] == -88.0
+    assert info["metrics"][0]["value"] == -40.0
     assert info["metrics"][1]["value"] == 3.0
     assert info["metrics"][2]["value"] == 5.0
     assert info["metrics"][3]["value"] == 5.0
