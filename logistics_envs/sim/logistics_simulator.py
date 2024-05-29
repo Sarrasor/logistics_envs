@@ -421,7 +421,7 @@ class LogisticsSimulator:
                         idle_rate=worker_idle_rate,
                         with_order_rate=worker_with_order_rate,
                         traveled_distance=worker.traveled_distance,
-                        consumed_fuel=worker.consumed_fuel,
+                        consumed_fuel=worker.consumed_fuel * 100.0,
                         n_service_station_visits=worker_to_station_visits[worker.id],
                     )
                 )
@@ -576,23 +576,22 @@ class LogisticsSimulator:
         # TODO(dburakov): Think about proper reward function
         current_reward = 0.0
         for order in self._orders.values():
-            if (
-                order.status == OrderStatus.COMPLETED
-                and order.completion_time is not None
-                and order.completion_time == self._current_time
-            ):
-                # TODO(dburakov): Think about complex time windows
-                if len(order.time_window) != 1:
-                    raise ValueError("Only simple time windows are supported")
+            if order.completion_time is not None and order.completion_time == self._current_time:
+                if order.status == OrderStatus.COMPLETED:
+                    # TODO(dburakov): Think about complex time windows
+                    if len(order.time_window) != 1:
+                        raise ValueError("Only simple time windows are supported")
 
-                start_penalty = max(0, order.time_window[0][0] - order.completion_time)
-                end_penalty = max(0, order.completion_time - order.time_window[0][1])
-                current_reward += max(start_penalty, end_penalty)
+                    start_penalty = max(0, order.time_window[0][0] - order.completion_time)
+                    end_penalty = max(0, order.completion_time - order.time_window[0][1])
+                    current_reward += max(start_penalty, end_penalty)
+                elif order.status == OrderStatus.CANCELED:
+                    current_reward += self._config.incomplete_order_penalty
+                else:
+                    raise ValueError(f"Unexpected order status: {order.status}")
 
-            if self._done and order.status != OrderStatus.COMPLETED:
-                start_penalty = max(0, order.time_window[0][0] - self._current_time)
-                end_penalty = max(0, self._current_time - order.time_window[0][1])
-                current_reward += max(start_penalty, end_penalty)
+            if self._done and not order.status.is_terminal():
+                current_reward += self._config.incomplete_order_penalty
 
         # Reward is negative since it is a penalty
         current_reward = -1.0 * current_reward

@@ -69,7 +69,7 @@ def test_idle_action(env: RideHailingEnv) -> None:
     assert len(info["orders"]) == 5
     assert len(info["workers"]) == 3
 
-    assert info["metrics"][0]["value"] == -212.0
+    assert info["metrics"][0]["value"] == -250.0
     assert info["metrics"][1]["value"] == 3.0
     assert info["metrics"][2]["value"] == 5.0
     assert info["metrics"][3]["value"] == 0.0

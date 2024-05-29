@@ -105,6 +105,7 @@ def sim() -> LogisticsSimulator:
         step_size=1,
         order_pickup_time=3,
         order_drop_off_time=5,
+        incomplete_order_penalty=40,
         render=RenderConfig(
             render_mode=RenderMode.NONE,
             config=None,
@@ -174,7 +175,7 @@ def test_noop_action(sim: LogisticsSimulator) -> None:
     assert len(last_obs.orders) == 3
     assert len(last_obs.workers) == 2
 
-    assert last_reward == -75.0
+    assert last_reward == -120.0
 
 
 def get_move_action(observation: Observation, target_location: Location) -> Action:

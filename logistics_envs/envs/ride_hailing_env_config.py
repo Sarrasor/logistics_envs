@@ -50,6 +50,7 @@ class RideHailingEnvConfig(BaseModel):
     max_rides: PositiveInt
     ride_pickup_time: NonNegativeInt
     ride_drop_off_time: NonNegativeInt
+    incomplete_ride_penalty: NonNegativeInt
     mode: LocationMode
     routing_host: Optional[str] = None
     seed: Optional[int] = None
@@ -134,6 +135,7 @@ class RideHailingEnvConfig(BaseModel):
             max_rides=config_data["max_rides"],
             ride_pickup_time=config_data["ride_pickup_time"],
             ride_drop_off_time=config_data["ride_drop_off_time"],
+            incomplete_ride_penalty=config_data["incomplete_ride_penalty"],
             seed=config_data["seed"],
             order_cancellation_threshold=config_data["order_cancellation_threshold"],
             mode=mode,

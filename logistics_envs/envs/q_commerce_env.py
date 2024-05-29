@@ -41,6 +41,7 @@ class QCommerceEnv(LogisticsSimWrapperEnv):
         order_generation_end_time: int,
         order_generation_probability: float,
         max_concurrent_orders: int,
+        incomplete_order_penalty: int,
         routing_host: Optional[str] = None,
         seed: Optional[int] = None,
         render_mode: Optional[str] = None,
@@ -102,6 +103,12 @@ class QCommerceEnv(LogisticsSimWrapperEnv):
                 f"max_concurrent_orders={max_concurrent_orders} must be greater than 0"
             )
         self._max_concurrent_orders = max_concurrent_orders
+
+        if incomplete_order_penalty < 0:
+            raise ValueError(
+                f"incomplete_order_penalty={incomplete_order_penalty} must be greater than or equal to 0"
+            )
+        self._incomplete_order_penalty = incomplete_order_penalty
 
         self._routing_host = routing_host
 
@@ -168,6 +175,7 @@ class QCommerceEnv(LogisticsSimWrapperEnv):
             "step_size": self._time_step,
             "order_pickup_time": self._order_pickup_time,
             "order_drop_off_time": self._order_drop_off_time,
+            "incomplete_order_penalty": self._incomplete_order_penalty,
             "render": render_config,
             "seed": self._seed,
         }

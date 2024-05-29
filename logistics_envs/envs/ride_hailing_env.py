@@ -138,6 +138,7 @@ class RideHailingEnv(LogisticsSimWrapperEnv):
             "step_size": self._config.time_step,
             "order_pickup_time": self._config.ride_pickup_time,
             "order_drop_off_time": self._config.ride_drop_off_time,
+            "incomplete_order_penalty": self._config.incomplete_ride_penalty,
             "render": render_config,
             "routing_provider": routing_provider_config,
             "seed": self._config.seed,

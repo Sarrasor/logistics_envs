@@ -24,6 +24,7 @@ def env() -> QCommerceEnv:
         "order_generation_end_time": 110,
         "order_generation_probability": 0.25,
         "max_concurrent_orders": 1,
+        "incomplete_order_penalty": 300,
         "seed": 42,
     }
     env = gym.make(
@@ -31,7 +32,7 @@ def env() -> QCommerceEnv:
         render_mode=None,
         **config,
     )
-    return env
+    return env  # type: ignore
 
 
 def test_reset(env: QCommerceEnv) -> None:

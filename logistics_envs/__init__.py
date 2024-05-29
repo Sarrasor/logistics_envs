@@ -83,6 +83,7 @@ register(
             max_rides=4,
             ride_pickup_time=2,
             ride_drop_off_time=1,
+            incomplete_ride_penalty=50,
             mode=LocationMode.CARTESIAN,
             routing_host=None,
             render_mode=None,

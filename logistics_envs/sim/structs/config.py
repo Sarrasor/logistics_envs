@@ -110,6 +110,7 @@ class LogisticsSimulatorConfig(BaseModel):
     # TODO(dburakov): add pickup and drop_off samplers
     order_pickup_time: NonNegativeInt
     order_drop_off_time: NonNegativeInt
+    incomplete_order_penalty: NonNegativeFloat
     render: RenderConfig
     order_cancellation_threshold: Optional[NonNegativeInt] = None
     routing_provider: Optional[RoutingProviderConfig] = None
