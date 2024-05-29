@@ -582,8 +582,11 @@ class LogisticsSimulator:
                     if len(order.time_window) != 1:
                         raise ValueError("Only simple time windows are supported")
 
-                    start_penalty = max(0, order.time_window[0][0] - order.completion_time)
-                    end_penalty = max(0, order.completion_time - order.time_window[0][1])
+                    if order.pickup_start_time is None:
+                        raise ValueError("Pickup start time is not set for completed order")
+
+                    start_penalty = max(0, order.time_window[0][0] - order.pickup_start_time)
+                    end_penalty = max(0, order.pickup_start_time - order.time_window[0][1])
                     current_reward += max(start_penalty, end_penalty)
                 elif order.status == OrderStatus.CANCELED:
                     current_reward += self._config.incomplete_order_penalty
