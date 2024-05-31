@@ -130,7 +130,7 @@ def test_deliver(env: RideHailingEnv) -> None:
     assert info["metrics"][2]["value"] == 5.0
     assert info["metrics"][3]["value"] == 5.0
     assert info["metrics"][4]["value"] == 2.6
-    assert info["metrics"][5]["value"] == 8.0
+    assert info["metrics"][5]["value"] == 5.4
     assert info["metrics"][6]["value"] == 8.0
     assert info["metrics"][7]["value"] == 6.6
     assert info["metrics"][8]["value"] == 100.0

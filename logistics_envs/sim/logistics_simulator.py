@@ -323,13 +323,13 @@ class LogisticsSimulator:
                     n_assigned_orders += 1
 
                 if order.status == OrderStatus.COMPLETED:
-                    if order.pickup_start_time is None:
-                        raise ValueError("Pickup start time is not set for completed order")
-                    average_time_to_pickup += order.pickup_start_time - order.creation_time
-
                     if order.assignment_time is None:
                         raise ValueError("Assignment time is not set for completed order")
                     average_time_to_assign += order.assignment_time - order.creation_time
+
+                    if order.pickup_start_time is None:
+                        raise ValueError("Pickup start time is not set for completed order")
+                    average_time_to_pickup += order.pickup_start_time - order.assignment_time
 
                     average_waiting_time += order.pickup_start_time - order.creation_time
 
