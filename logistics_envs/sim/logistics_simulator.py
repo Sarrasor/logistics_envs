@@ -314,6 +314,8 @@ class LogisticsSimulator:
             worker_to_assigned_orders = {worker.id: 0 for worker in self._workers.values()}
             average_time_to_assign = 0.0
             average_time_to_pickup = 0.0
+            average_waiting_time = 0.0
+            average_trip_duration = 0.0
             n_completed_orders = 0
             n_assigned_orders = 0
             for order in self._orders.values():
@@ -328,6 +330,17 @@ class LogisticsSimulator:
                     if order.assignment_time is None:
                         raise ValueError("Assignment time is not set for completed order")
                     average_time_to_assign += order.assignment_time - order.creation_time
+
+                    average_waiting_time += order.pickup_start_time - order.creation_time
+
+                    if order.drop_off_start_time is None:
+                        raise ValueError("Drop off start time is not set for completed order")
+
+                    if order.pickup_end_time is None:
+                        raise ValueError("Pickup end time is not set for completed order")
+
+                    average_trip_duration += order.drop_off_start_time - order.pickup_end_time
+
                     n_completed_orders += 1
 
                     if order.assigned_worker_id is None:
@@ -359,9 +372,13 @@ class LogisticsSimulator:
             if n_completed_orders != 0:
                 average_time_to_pickup /= n_completed_orders
                 average_time_to_assign /= n_completed_orders
+                average_waiting_time /= n_completed_orders
+                average_trip_duration /= n_completed_orders
             else:
                 average_time_to_pickup = float("inf")
                 average_time_to_assign = float("inf")
+                average_waiting_time = float("inf")
+                average_trip_duration = float("inf")
 
             worker_to_station_visits = {worker.id: 0 for worker in self._workers.values()}
             for service_station in self._service_stations.values():
@@ -478,6 +495,20 @@ class LogisticsSimulator:
                 {
                     "name": "Average time to pickup",
                     "value": average_time_to_pickup,
+                    "unit": "steps" if self._location_mode == LocationMode.CARTESIAN else "min",
+                }
+            )
+            metrics.append(
+                {
+                    "name": "Average waiting time",
+                    "value": average_waiting_time,
+                    "unit": "steps" if self._location_mode == LocationMode.CARTESIAN else "min",
+                }
+            )
+            metrics.append(
+                {
+                    "name": "Average trip duration",
+                    "value": average_trip_duration,
                     "unit": "steps" if self._location_mode == LocationMode.CARTESIAN else "min",
                 }
             )

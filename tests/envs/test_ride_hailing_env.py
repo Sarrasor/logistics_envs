@@ -75,12 +75,14 @@ def test_idle_action(env: RideHailingEnv) -> None:
     assert info["metrics"][3]["value"] == 0.0
     assert info["metrics"][4]["value"] == float("inf")
     assert info["metrics"][5]["value"] == float("inf")
-    assert info["metrics"][6]["value"] == 0.0
-    assert info["metrics"][7]["value"] == 0.0
-    assert info["metrics"][8]["value"] == 100.0
+    assert info["metrics"][6]["value"] == float("inf")
+    assert info["metrics"][7]["value"] == float("inf")
+    assert info["metrics"][8]["value"] == 0.0
     assert info["metrics"][9]["value"] == 0.0
-    assert info["metrics"][10]["value"] == 0.0
+    assert info["metrics"][10]["value"] == 100.0
     assert info["metrics"][11]["value"] == 0.0
+    assert info["metrics"][12]["value"] == 0.0
+    assert info["metrics"][13]["value"] == 0.0
 
 
 def get_fifo_deliver_action(observation: dict) -> dict:
@@ -129,9 +131,11 @@ def test_deliver(env: RideHailingEnv) -> None:
     assert info["metrics"][3]["value"] == 5.0
     assert info["metrics"][4]["value"] == 2.6
     assert info["metrics"][5]["value"] == 8.0
-    assert info["metrics"][6]["value"] == 100.0
-    assert info["metrics"][7]["value"] == 100.0
-    assert info["metrics"][8]["value"] == 50.0
-    assert info["metrics"][9]["value"] == 32.0
-    assert info["metrics"][10]["value"] > 0.0
-    assert info["metrics"][11]["value"] == 0.0
+    assert info["metrics"][6]["value"] == 8.0
+    assert info["metrics"][7]["value"] == 6.6
+    assert info["metrics"][8]["value"] == 100.0
+    assert info["metrics"][9]["value"] == 100.0
+    assert info["metrics"][10]["value"] == 50.0
+    assert info["metrics"][11]["value"] == 32.0
+    assert info["metrics"][12]["value"] > 0.0
+    assert info["metrics"][13]["value"] == 0.0
